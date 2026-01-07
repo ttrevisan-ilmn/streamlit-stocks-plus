@@ -1,5 +1,7 @@
 # Mphinancial Stock Analysis Terminal
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://app-stocks-plus.streamlit.app/)
+
 A comprehensive quantitative research platform built with Streamlit, integrating technical analysis, sector rotation models, options flow intelligence, and alternative data.
 
 ## 🚀 Key Features

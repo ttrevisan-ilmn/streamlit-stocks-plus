@@ -31,8 +31,10 @@ def fetch_congress_members(api_key=None):
             "currentMember": "true",
             "format": "json"
         }
+        # Add basic UA to avoid weak bot blocks
+        headers = {'User-Agent': 'Streamlit-Stock-Analysis-App/1.0'}
         
-        response = requests.get(url, params=params, timeout=30)
+        response = requests.get(url, params=params, headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
@@ -52,10 +54,12 @@ def fetch_congress_members(api_key=None):
             
             return pd.DataFrame(records)
         else:
+            st.error(f"Congress.gov API Error {response.status_code}: {response.reason}")
+            # print(f"API Response: {response.text}") # Debugging
             return pd.DataFrame()
             
     except Exception as e:
-        print(f"Error fetching members: {e}")
+        st.error(f"Connection Error: {str(e)}")
         return pd.DataFrame()
 
 

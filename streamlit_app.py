@@ -97,7 +97,7 @@ st.markdown("""
 st.sidebar.title("Phinancial Terminal")
 
 # Ticker input
-ticker = st.sidebar.text_input("Enter Ticker:", placeholder="e.g. SPY, AAPL").upper()
+ticker = st.sidebar.text_input("Enter Ticker:", value="SPY", placeholder="e.g. SPY, AAPL").upper()
 
 # --- WATCHLIST ---
 if 'watchlist' not in st.session_state:
@@ -164,7 +164,7 @@ with st.sidebar.expander("⚙️ Settings"):
         st.markdown("[Get a free key](https://api.congress.gov/sign-up/)")
 
 # --- MAIN TABS ---
-tab1, tab2, tab5, tab3, tab4 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades"])
+tab1, tab2, tab5, tab3, tab6, tab4 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🌪️ Options Flow", "🏛️ Congress Trades"])
 
 # --- TAB 1: MARKET HEALTH DASHBOARD ---
 with tab1:
@@ -493,15 +493,17 @@ with tab2:
         
         styled_df = display_df.style.map(color_category, subset=['Category'])
         
-        st.dataframe(styled_df, width="stretch", hide_index=True)
-        
-        st.caption("""
-        **How to Read Rankings:**
-        - Lower rank numbers (1-3) = strongest asset inflows → Allocate here
-        - Each timeframe ranks sectors 1-11 based on asset flows
-        - Total Score = sum of all timeframe ranks (lower is better)
-        - **Favored** (score ≤20) • **Neutral** (21-32) • **Avoid** (≥33)
-        """)
+        # Rankings Table (Compacted into Expander)
+        with st.expander("📊 View Complete Sector Rankings Table", expanded=False):
+            st.dataframe(styled_df, width="stretch", hide_index=True)
+            
+            st.caption("""
+            **How to Read Rankings:**
+            - Lower rank numbers (1-3) = strongest asset inflows → Allocate here
+            - Each timeframe ranks sectors 1-11 based on asset flows
+            - Total Score = sum of all timeframe ranks (lower is better)
+            - **Favored** (score ≤20) • **Neutral** (21-32) • **Avoid** (≥33)
+            """)
         
         st.divider()
         
@@ -897,319 +899,233 @@ with tab3:
             else:
                 st.warning("Could not fetch fundamental data.")
 
-            # --- ΓAMMA & VOLUME PROFILE ---
+
+
+        elif not data.empty:
+            st.warning(f"Insufficient historical data for {ticker} (need at least 200 days).")
+            
+            # --- OPTIONS INTELLIGENCE TAB MOVED ---
+    else:
+        st.info("Enter a ticker in the sidebar to begin analysis")
+
+
+# --- TAB 6: OPTIONS INTELLIGENCE ---
+with tab6:
+    st.title("🌪️ Options Flow & Gamma Profile")
+    
+    if ticker:
+         # --- ΓAMMA & VOLUME PROFILE ---
+        st.subheader(f"📊 Gamma Profile: {ticker}")
+        
+        with st.spinner(f"Fetching options data for {ticker}..."):
+            track_api_call()  # Track options chain fetch
+            gamma_data = get_gamma_profile(ticker)
+        
+        if 'error' in gamma_data:
+            st.warning(f"⚠️ {gamma_data['error']}")
+            st.caption("Note: Gamma profile requires active options trading on the ticker")
+        else:
+            # Key metrics
+            stats = gamma_data['stats']
+            spot = gamma_data['spot']
+            
+            # Metrics row with better visibility
+            st.markdown("### Options Metrics")
+            gm1, gm2, gm3, gm4 = st.columns(4)
+            
+            # Custom styled metrics for better visibility
+            net_gex_val = stats['net_gex'] / 1e6
+            gex_color_bg = "#1a4d2e" if net_gex_val > 0 else "#4d1a1a"
+            gex_emoji = "🟢" if net_gex_val > 0 else "🔴"
+            
+            gm1.markdown(f"""
+            <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
+                <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Spot Price</p>
+                <h2 style='color: white; margin: 5px 0;'>${spot:.2f}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            gm2.markdown(f"""
+            <div style='background-color: {gex_color_bg}; padding: 15px; border-radius: 8px; text-align: center;'>
+                <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Net GEX</p>
+                <h2 style='color: white; margin: 5px 0;'>{gex_emoji} ${net_gex_val:.1f}M</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            
+            # Fix max GEX strike display
+            max_gex_display = f"${stats['max_gex_strike']:.2f}" if stats['max_gex_strike'] is not None else "N/A"
+            
+            gm3.markdown(f"""
+            <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
+                <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Max GEX Strike</p>
+                <h2 style='color: white; margin: 5px 0;'>{max_gex_display}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            put_call_ratio = stats['total_put_volume'] / max(stats['total_call_volume'], 1)
+            gm4.markdown(f"""
+            <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
+                <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Put/Call Vol</p>
+                <h2 style='color: white; margin: 5px 0;'>{put_call_ratio:.2f}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.caption(f"Last updated: {gamma_data['timestamp']}")
+            
             st.divider()
-            st.subheader("📊 Gamma & Volume Profile (Options Analysis)")
             
-            with st.spinner(f"Fetching options data for {ticker}..."):
-                track_api_call()  # Track options chain fetch
-                gamma_data = get_gamma_profile(ticker)
-            
-            if 'error' in gamma_data:
-                st.warning(f"⚠️ {gamma_data['error']}")
-                st.caption("Note: Gamma profile requires active options trading on the ticker")
-            else:
-                # Key metrics
-                stats = gamma_data['stats']
-                spot = gamma_data['spot']
+            # Enhanced interpretation with analysis
+            if net_gex_val > 0:
+                st.info("""📌 **Positive Net GEX**: Dealers are long gamma → **Stabilizing Environment**
                 
-                # Metrics row with better visibility
-                st.markdown("### Options Metrics")
-                gm1, gm2, gm3, gm4 = st.columns(4)
-                
-                # Custom styled metrics for better visibility
-                net_gex_val = stats['net_gex'] / 1e6
-                gex_color_bg = "#1a4d2e" if net_gex_val > 0 else "#4d1a1a"
-                gex_emoji = "🟢" if net_gex_val > 0 else "🔴"
-                
-                gm1.markdown(f"""
-                <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
-                    <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Spot Price</p>
-                    <h2 style='color: white; margin: 5px 0;'>${spot:.2f}</h2>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                gm2.markdown(f"""
-                <div style='background-color: {gex_color_bg}; padding: 15px; border-radius: 8px; text-align: center;'>
-                    <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Net GEX</p>
-                    <h2 style='color: white; margin: 5px 0;'>{gex_emoji} ${net_gex_val:.1f}M</h2>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                
-                # Fix max GEX strike display
-                max_gex_display = f"${stats['max_gex_strike']:.2f}" if stats['max_gex_strike'] is not None else "N/A"
-                
-                gm3.markdown(f"""
-                <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
-                    <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Max GEX Strike</p>
-                    <h2 style='color: white; margin: 5px 0;'>{max_gex_display}</h2>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                put_call_ratio = stats['total_put_volume'] / max(stats['total_call_volume'], 1)
-                gm4.markdown(f"""
-                <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
-                    <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Put/Call Vol</p>
-                    <h2 style='color: white; margin: 5px 0;'>{put_call_ratio:.2f}</h2>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.caption(f"Last updated: {gamma_data['timestamp']}")
-                
-                st.divider()
-                
-                # Enhanced interpretation with analysis
-                if net_gex_val > 0:
-                    st.info("""📌 **Positive Net GEX**: Dealers are long gamma → **Stabilizing Environment**
-                    
 **What this means:**
 - Market makers will buy dips and sell rallies to maintain delta-neutral hedges
 - Price tends to revert toward high-GEX strikes (acts as magnet)
 - Lower volatility expected as hedging dampens price swings
 - Breakouts require stronger momentum to overcome dealer resistance""")
-                else:
-                    st.warning("""📌 **Negative Net GEX**: Dealers are short gamma → **Volatizing Environment**
-                    
+            else:
+                st.warning("""📌 **Negative Net GEX**: Dealers are short gamma → **Volatizing Environment**
+                
 **What this means:**
 - Market makers will sell dips and buy rallies (amplifying moves)
 - Price can accelerate through strikes with negative GEX
 - Higher volatility expected as hedging exacerbates price swings  
 - Trends can develop more easily without dealer resistance""")
+            
+            # Additional analysis
+            st.markdown("""**Key Observations:**""")
+            analysis_points = []
+            
+            if stats['max_gex_strike']:
+                distance_to_max = ((stats['max_gex_strike'] - spot) / spot) * 100
+                analysis_points.append(f"• Max GEX at ${stats['max_gex_strike']:.2f} ({distance_to_max:+.1f}% from spot) - this level acts as a price magnet")
+            
+            if put_call_ratio > 1.5:
+                analysis_points.append(f"• High put/call ratio ({put_call_ratio:.2f}) suggests defensive positioning or bearish sentiment")
+            
+            for point in analysis_points:
+                st.markdown(point)
                 
-                # Additional analysis
-                st.markdown("""**Key Observations:**""")
-                analysis_points = []
-                
-                if stats['max_gex_strike']:
-                    distance_to_max = ((stats['max_gex_strike'] - spot) / spot) * 100
-                    analysis_points.append(f"• Max GEX at ${stats['max_gex_strike']:.2f} ({distance_to_max:+.1f}% from spot) - this level acts as a price magnet")
-                
-                if put_call_ratio > 1.5:
-                    analysis_points.append(f"• High put/call ratio ({put_call_ratio:.2f}) suggests defensive positioning or bearish sentiment")
-                elif put_call_ratio < 0.7:
-                    analysis_points.append(f"• Low put/call ratio ({put_call_ratio:.2f}) suggests bullish positioning or call buying")
-                else:
-                    analysis_points.append(f"• Balanced put/call ratio ({put_call_ratio:.2f}) suggests neutral sentiment")
-                
-                if abs(net_gex_val) < 100:
-                    analysis_points.append("• Low absolute GEX suggests reduced dealer influence on price action")
-                elif abs(net_gex_val) > 1000:
-                    analysis_points.append("• Very high absolute GEX suggests strong dealer influence on price dynamics")
-                
-                for point in analysis_points:
-                    st.markdown(point)
-                
-                st.divider()
-                
-                # Charts
-                gex_series = gamma_data['gex']
-                vol_df = gamma_data['volume']
-                
-                # Create dual-panel chart
-                fig_gamma = make_subplots(
-                    rows=2, cols=1,
-                    shared_xaxes=True,
-                    vertical_spacing=0.1,
-                    subplot_titles=("Net Gamma Exposure (GEX) by Strike", "Volume by Strike"),
-                    row_heights=[0.6, 0.4]
-                )
-                
-                # 1. GEX Chart
-                colors = ['#00FF00' if v >= 0 else '#FF0000' for v in gex_series.values]
-                
+            # Charts
+            col_gamma, col_vol = st.columns(2)
+            
+            with col_gamma:
+                st.subheader("Gamma Exposure by Strike")
+                fig_gamma = go.Figure()
                 fig_gamma.add_trace(go.Bar(
-                    x=gex_series.index,
-                    y=gex_series.values,
-                    name='Net GEX',
-                    marker_color=colors,
-                    hovertemplate='Strike: $%{x:.2f}<br>GEX: $%{y:,.0f}<extra></extra>',
-                    showlegend=False
-                ), row=1, col=1)
+                    x=gamma_data['df']['strike'],
+                    y=gamma_data['df']['total_gamma'] / 1e6,
+                    name='Total Gamma',
+                    marker_color=['#4ade80' if x > 0 else '#ef4444' for x in gamma_data['df']['total_gamma']]
+                ))
+                fig_gamma.update_layout(template="plotly_dark", height=400)
+                # Update axis titles
+                fig_gamma.update_layout(showlegend=False)
+                fig_gamma.update_yaxes(title_text="Gamma ($M)", row=1, col=1)
+                fig_gamma.update_xaxes(title_text="Strike Price ($)", row=1, col=1)
                 
-                # Add spot price line
-                fig_gamma.add_vline(
-                    x=spot,
-                    line_width=2,
-                    line_dash="dash",
-                    line_color="white",
-                    annotation_text=f"Spot: ${spot:.2f}",
-                    annotation_position="top right"
-                )
-                
-                # 2. Volume Chart
-                if 'call' in vol_df.columns:
-                    fig_gamma.add_trace(go.Bar(
-                        x=vol_df.index,
-                        y=vol_df['call'],
-                        name='Call Volume',
-                        marker_color='#4ade80',
-                        hovertemplate='Strike: $%{x:.2f}<br>Calls: %{y:,.0f}<extra></extra>'
-                    ), row=2, col=1)
-                
-                if 'put' in vol_df.columns:
-                    fig_gamma.add_trace(go.Bar(
-                        x=vol_df.index,
-                        y=vol_df['put'],
-                        name='Put Volume',
-                        marker_color='#ef4444',
-                        hovertemplate='Strike: $%{x:.2f}<br>Puts: %{y:,.0f}<extra></extra>'
-                    ), row=2, col=1)
-                
-                # Update layout
-                fig_gamma.update_layout(
-                    template="plotly_dark",
-                    height=700,
-                    barmode='stack',
-                    hovermode="x unified",
-                    showlegend=True,
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                    margin=dict(l=0, r=0, t=40, b=0)
-                )
-                
-                fig_gamma.update_yaxes(title_text="Net GEX ($)", row=1, col=1)
-                fig_gamma.update_yaxes(title_text="Volume", row=2, col=1)
-                fig_gamma.update_xaxes(title_text="Strike Price ($)", row=2, col=1)
+                # Add spot line
+                fig_gamma.add_vline(x=spot, line_dash="dash", line_color="white", annotation_text="Spot")
                 
                 st.plotly_chart(fig_gamma, width="stretch")
-                
-                # Explanation
-                with st.expander("ℹ️ Understanding Gamma Exposure"):
-                    st.markdown("""
-                    **What is Gamma Exposure (GEX)?**
-                    
-                    Gamma measures how fast an option's delta changes as the stock price moves. When market makers sell options, they hedge by buying/selling the underlying stock, creating price pressure.
-                    
-                    **Interpretation:**
-                    - **Positive GEX (Green bars)**: Call-heavy strikes → Dealers are LONG gamma
-                      - They buy dips and sell rallies → **Stabilizing**
-                      - Price tends to be "sticky" around these levels
-                      
-                    - **Negative GEX (Red bars)**: Put-heavy strikes → Dealers are SHORT gamma
-                      - They sell dips and buy rallies → **Volatizing**  
-                      - Price can accelerate through these levels
-                    
-                    **Key Levels:**
-                    - **Max GEX Strike**: Strongest price magnet (highest dealer hedging activity)
-                    - **Zero GEX Level**: Inflection point where dynamics shift
-                    - **High Volume Strikes**: Areas of significant interest/support/resistance
-                    """)
             
-            # --- OPTIONS FLOW ANALYSIS (FLOWTOPIA-INSPIRED) ---
-            st.divider()
-            st.subheader("🌊 Options Flow Analysis (Daily Premium Tracker)")
-            
-            with st.spinner(f"Analyzing options flow for {ticker}..."):
-                track_api_call()  # Track flow analysis fetch
-                flow_data = get_daily_flow_snapshot(ticker)
-            
-            if 'error' in flow_data:
-                st.warning(f"⚠️ {flow_data['error']}")
-                st.caption("Note: Options flow analysis requires active options trading")
-            else:
-                # Get sentiment analysis
-                sentiment = analyze_flow_sentiment(flow_data)
+            with col_vol:
+                st.subheader("Volume Profile")
+                fig_vol = go.Figure()
+                fig_vol.add_trace(go.Bar(
+                    x=gamma_data['df']['strike'],
+                    y=gamma_data['df']['call_volume'],
+                    name='Call Vol',
+                    marker_color='#4ade80'
+                ))
+                fig_vol.add_trace(go.Bar(
+                    x=gamma_data['df']['strike'],
+                    y=gamma_data['df']['put_volume'],
+                    name='Put Vol',
+                    marker_color='#ef4444'
+                ))
+                fig_vol.update_layout(template="plotly_dark", height=400, barmode='stack')
+                fig_vol.update_yaxes(title_text="Volume", row=1, col=1)
+                fig_vol.update_xaxes(title_text="Strike Price ($)", row=1, col=1)
+                fig_vol.add_vline(x=spot, line_dash="dash", line_color="white", annotation_text="Spot")
                 
-                # Key metrics row
-                st.markdown("### Flow Metrics")
-                fm1, fm2, fm3, fm4 = st.columns(4)
-                
-                # Net premium with color coding
-                net_prem_millions = flow_data['net_premium'] / 1e6
-                net_prem_color = "#1a4d2e" if net_prem_millions > 0 else "#4d1a1a"
-                net_prem_emoji = "🟢" if net_prem_millions > 0 else "🔴"
-                
-                fm1.markdown(f"""
-                <div style='background-color: {net_prem_color}; padding: 15px; border-radius: 8px; text-align: center;'>
-                    <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Net Premium</p>
-                    <h2 style='color: white; margin: 5px 0;'>{net_prem_emoji} ${net_prem_millions:.1f}M</h2>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                fm2.markdown(f"""
-                <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
-                    <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Put/Call Premium</p>
-                    <h2 style='color: white; margin: 5px 0;'>{flow_data['pc_premium_ratio']:.2f}</h2>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                fm3.markdown(f"""
-                <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
-                    <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Put/Call Volume</p>
-                    <h2 style='color: white; margin: 5px 0;'>{flow_data['pc_volume_ratio']:.2f}</h2>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                unusual_total = flow_data['unusual_calls_count'] + flow_data['unusual_puts_count']
-                fm4.markdown(f"""
-                <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
-                    <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Unusual Contracts</p>
-                    <h2 style='color: white; margin: 5px 0;'>{unusual_total}</h2>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.caption(f"Last updated: {flow_data['timestamp']}")
-                
-                st.divider()
-                
-                # Sentiment Analysis
-                sentiment_emoji = {
-                    'STRONGLY BULLISH': '🚀',
-                    'BULLISH': '📈',
-                    'BEARISH': '📉',
-                    'STRONGLY BEARISH': '💥'
-                }
-                
-                st.markdown(f"### {sentiment_emoji.get(sentiment['sentiment'], '📊')} Sentiment: {sentiment['sentiment']}")
-                
-                st.info(f"""**{sentiment['description']}**
+                st.plotly_chart(fig_vol, width="stretch")
 
-**Flow Characteristics:**
-- Volume Bias: {sentiment['volume_bias']}
-- Premium Bias: {sentiment['premium_bias']}
-- Unusual Activity: {'Yes' if sentiment['has_unusual_activity'] else 'No'} ({sentiment['unusual_count']} contracts)
-
-**Total Premium:**
-- Calls: ${flow_data['total_call_premium']/1e6:.1f}M
-- Puts: ${flow_data['total_put_premium']/1e6:.1f}M
-- Net: ${net_prem_millions:+.1f}M
-                """)
-                
-                st.divider()
-                
-                # Unusual Activity Scanner
-                if unusual_total > 0:
-                    st.markdown("### 🔍 Unusual Activity (Volume > 2× Open Interest)")
-                    
-                    ua_col1, ua_col2 = st.columns(2)
-                    
-                    with ua_col1:
-                        st.markdown("**📞 Unusual Calls**")
-                        if not flow_data['unusual_calls'].empty:
-                            unusual_calls_display = flow_data['unusual_calls'][['strike', 'expiration', 'volume', 'openInterest', 'premium']].copy()
-                            unusual_calls_display['premium'] = unusual_calls_display['premium'].apply(lambda x: f"${x:,.0f}")
-                            st.dataframe(unusual_calls_display, width="stretch", hide_index=True)
-                        else:
-                            st.caption("None detected")
-                    
-                    with ua_col2:
-                        st.markdown("**📉 Unusual Puts**")
-                        if not flow_data['unusual_puts'].empty:
-                            unusual_puts_display = flow_data['unusual_puts'][['strike', 'expiration', 'volume', 'openInterest', 'premium']].copy()
-                            unusual_puts_display['premium'] = unusual_puts_display['premium'].apply(lambda x: f"${x:,.0f}")
-                            st.dataframe(unusual_puts_display, width="stretch", hide_index=True)
-                        else:
-                            st.caption("None detected")
-                    
-                    st.divider()
-                
-                # Top Contracts by Premium
-                st.markdown("### 💰 Top 5 Contracts by Premium")
-                
-                top_col1, top_col2 = st.columns(2)
-                
-                with top_col1:
-                    st.markdown("**📞 Top Calls**")
+        
+        # --- OPTIONS FLOW ANALYSIS ---
+        st.divider()
+        st.subheader(f"🌊 Options Flow Analysis: {ticker}")
+        
+        with st.spinner("Fetching daily flow data..."):
+            flow_data = get_daily_flow_snapshot(ticker)
+        
+        if not flow_data:
+            st.warning("No flow data available.")
+        else:
+            # Metrics
+            f1, f2, f3 = st.columns(3)
+            
+            # Net Premium Color
+            net_prem = flow_data['net_premium']
+            prem_color = "#1a4d2e" if net_prem > 0 else "#4d1a1a"
+            prem_emoji = "🐂" if net_prem > 0 else "🐻"
+            
+            f1.markdown(f"""
+            <div style='background-color: {prem_color}; padding: 15px; border-radius: 8px; text-align: center;'>
+                <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Net Premium</p>
+                <h2 style='color: white; margin: 5px 0;'>{prem_emoji} ${net_prem:,.0f}</h2>
+                <p style='color: #d1d5db; font-size: 0.8em; margin: 0;'>Diff: Call $ - Put $</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            f2.markdown(f"""
+            <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
+                <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>P/C Premium Ratio</p>
+                <h2 style='color: white; margin: 5px 0;'>{flow_data['put_call_premium_ratio']:.2f}</h2>
+                <p style='color: #d1d5db; font-size: 0.8em; margin: 0;'>Bearish > 1.0</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            f3.markdown(f"""
+            <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
+                <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>Unusual Contracts</p>
+                <h2 style='color: white; margin: 5px 0;'>{len(flow_data['unusual_calls']) + len(flow_data['unusual_puts'])}</h2>
+                <p style='color: #d1d5db; font-size: 0.8em; margin: 0;'>Vol > 1.5x OI</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Sentiment Logic
+            sentiment = analyze_flow_sentiment(flow_data)
+            st.info(f"**Flow Sentiment:** {sentiment}")
+            
+            st.markdown("---")
+            
+            # Unusual Activity
+            st.markdown("### 🔥 Unusual Activity (Vol > OI)")
+            tab_calls, tab_puts = st.tabs(["Unusual Calls", "Unusual Puts"])
+            
+            with tab_calls:
+                if not flow_data['unusual_calls'].empty:
+                    unusual_calls_display = flow_data['unusual_calls'][['strike', 'expiration', 'volume', 'openInterest', 'premium']].copy()
+                    unusual_calls_display['premium'] = unusual_calls_display['premium'].apply(lambda x: f"${x:,.0f}")
+                    st.dataframe(unusual_calls_display, width="stretch", hide_index=True)
+                else:
+                    st.caption("None detected")
+            
+            with tab_puts:
+                if not flow_data['unusual_puts'].empty:
+                    unusual_puts_display = flow_data['unusual_puts'][['strike', 'expiration', 'volume', 'openInterest', 'premium']].copy()
+                    unusual_puts_display['premium'] = unusual_puts_display['premium'].apply(lambda x: f"${x:,.0f}")
+                    st.dataframe(unusual_puts_display, width="stretch", hide_index=True)
+                else:
+                    st.caption("None detected")
+            
+            # Top Contracts
+            with st.expander("View Top Contracts by Premium"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.subheader("Top Calls")
                     if not flow_data['top_calls'].empty:
                         top_calls_display = flow_data['top_calls'].copy()
                         top_calls_display['premium'] = top_calls_display['premium'].apply(lambda x: f"${x:,.0f}")
@@ -1217,8 +1133,8 @@ with tab3:
                     else:
                         st.caption("No data")
                 
-                with top_col2:
-                    st.markdown("**📉 Top Puts**")
+                with c2:
+                    st.subheader("Top Puts")
                     if not flow_data['top_puts'].empty:
                         top_puts_display = flow_data['top_puts'].copy()
                         top_puts_display['premium'] = top_puts_display['premium'].apply(lambda x: f"${x:,.0f}")
@@ -1226,47 +1142,14 @@ with tab3:
                     else:
                         st.caption("No data")
                 
-                # Educational info
-                with st.expander("ℹ️ Understanding Options Flow"):
-                    st.markdown("""
-                    **What is Options Flow Analysis?**
-                    
-                    Options flow tracks where "smart money" is positioning  by analyzing premium (dollar volume) in calls vs puts. Unlike simple volume, premium accounts for the actual money being deployed.
-                    
-                    **Key Metrics:**
-                    
-                    - **Net Premium**: Call Premium - Put Premium. Positive = bullish, Negative = bearish.
-                      The dollar amount shows conviction level.
-                      
-                    - **Put/Call Premium Ratio**: Measures relative bearish vs bullish premium.
-                      - < 0.7: Very bullish (heavy call buying)
-                      - 0.7-1.2: Balanced
-                      - > 1.5: Very bearish (heavy put buying)
-                    
-                    - **Unusual Activity**: Contracts where daily volume exceeds 2× open interest.
-                      Signals new, high-conviction positions (not just closing old positions).
-                    
-                    **Daily Snapshot Limitations:**
-                    
-                    This analysis uses end-of-day data, not real-time tick-by-tick flow like professional platforms. It provides:
-                    - ✅ Daily aggregate premium flows
-                    - ✅ Unusual activity identification
-                    - ✅ Sentiment gauges
-                    - ❌ Intraday momentum
-                    - ❌ Bid/ask aggression
-                    - ❌ Real-time "waves"
-                    
-                    Best used to confirm multi-day directional bias and spot unusual institutional positioning.
-                    """)
-
-
-        elif not data.empty:
-            st.warning(f"Insufficient historical data for {ticker} (need at least 200 days).")
+            st.caption("""
+            **Educational Note:** 
+            - **Net Premium**: The total premium spent on Calls minus Puts. Positive = Bullish flow.
+            - **Unusual Activity**: Contracts where today's volume is significantly higher than existing Open Interest, suggesting fresh positioning.
+            - *Note: This is retail-access data (delayed/aggregated) and not comparable to institutional feeds like Bloomberg.*
+            """)
     else:
-        st.info("Enter a ticker in the sidebar to begin analysis")
-
-
-# --- TAB 4: CONGRESSIONAL TRADING ---
+        st.info("Enter a ticker in the sidebar to view options intelligence.")
 with tab4:
     st.title("🏛️ Congressional Trading Tracker")
     
