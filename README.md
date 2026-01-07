@@ -52,10 +52,13 @@ Track the "Smart Money" in Washington using the STOCK Act disclosures.
    pip install -r requirements.txt
    ```
 
-3. **Configure Secrets (Crucial!)**
-   To use the Congressional Trading feature, you must configure your API key.
-   
-   Create a file at `.streamlit/secrets.toml`:
+3. **Configure Secrets** (Two Options)
+
+   **Option A: Sidebar Input (Easiest)**
+   Simply run the app. If no secrets are found, a "⚙️ Settings" menu will appear in the sidebar where you can paste your API key.
+
+   **Option B: secrets.toml (Persistent)**
+   To avoid entering the key every time, create a file at `.streamlit/secrets.toml`:
    ```toml
    # .streamlit/secrets.toml
    congress_api_key = "YOUR_CONGRESS_GOV_API_KEY"
