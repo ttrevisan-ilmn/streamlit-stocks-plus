@@ -97,5 +97,35 @@ class TestCoreModules(unittest.TestCase):
         for col in expected_cols:
             self.assertIn(col, result.columns)
 
+    @patch('options_flow.yf.Ticker')
+    def test_options_flow_structure(self, mock_ticker_class):
+        """Verify Options Flow returns correct keys (pc_premium_ratio, etc)."""
+        mock_ticker = MagicMock()
+        mock_ticker_class.return_value = mock_ticker
+        
+        # Mock options
+        mock_ticker.options = ['2023-01-01']
+        mock_ticker.info = {'currentPrice': 100}
+        
+        # Mock chain
+        mock_chain = MagicMock()
+        mock_chain.calls = pd.DataFrame({
+            'strike': [100], 'lastPrice': [5.0], 'volume': [100], 
+            'openInterest': [50], 'expiration': ['2023-01-01']
+        })
+        mock_chain.puts = pd.DataFrame({
+            'strike': [100], 'lastPrice': [4.0], 'volume': [80], 
+            'openInterest': [40], 'expiration': ['2023-01-01']
+        })
+        mock_ticker.option_chain.return_value = mock_chain
+        
+        result = get_daily_flow_snapshot("TEST")
+        
+        # Verify Critical Keys expected by UI
+        self.assertIn('pc_premium_ratio', result)  # The key that caused the crash
+        self.assertIn('pc_volume_ratio', result)
+        self.assertIn('net_premium', result)
+        self.assertIn('unusual_calls', result)
+
 if __name__ == '__main__':
     unittest.main()

@@ -1086,7 +1086,7 @@ with tab6:
             f2.markdown(f"""
             <div style='background-color: #1e3a5f; padding: 15px; border-radius: 8px; text-align: center;'>
                 <p style='color: #94a3b8; margin: 0; font-size: 0.9em;'>P/C Premium Ratio</p>
-                <h2 style='color: white; margin: 5px 0;'>{flow_data['put_call_premium_ratio']:.2f}</h2>
+                <h2 style='color: white; margin: 5px 0;'>{flow_data['pc_premium_ratio']:.2f}</h2>
                 <p style='color: #d1d5db; font-size: 0.8em; margin: 0;'>Bearish > 1.0</p>
             </div>
             """, unsafe_allow_html=True)
