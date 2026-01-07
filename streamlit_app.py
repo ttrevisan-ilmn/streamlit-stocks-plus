@@ -221,7 +221,7 @@ with tab1:
                 ))
                 fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
                                       font={'color': "white"}, height=160, margin=dict(l=10, r=10, t=30, b=10))
-                st.plotly_chart(fig_gauge, use_container_width=True)
+                st.plotly_chart(fig_gauge, width="stretch")
             
             with signal_col:
                 if signal == 'BUY':
@@ -244,7 +244,11 @@ with tab1:
             try:
                 import yfinance as yf
                 vix_spot = yf.download('^VIX', period='1d', progress=False)['Close'].iloc[-1]
+                if hasattr(vix_spot, "item"): vix_spot = vix_spot.item()
+                
                 vix3m = yf.download('^VIX3M', period='1d', progress=False)['Close'].iloc[-1]
+                if hasattr(vix3m, "item"): vix3m = vix3m.item()
+                
                 spread = float(vix3m) - float(vix_spot)
                 
                 structure_color = "#1a4d2e" if spread > 0 else "#4d1a1a"
@@ -339,7 +343,7 @@ with tab1:
                 margin=dict(l=0, r=0, t=30, b=0)
             )
             
-            st.plotly_chart(fig_history, use_container_width=True)
+            st.plotly_chart(fig_history, width="stretch")
         
         st.divider()
         
@@ -464,7 +468,7 @@ with tab2:
                         showlegend=False
                     )
                     
-                    st.plotly_chart(fig_mini, use_container_width=True)
+                    st.plotly_chart(fig_mini, width="stretch")
                 else:
                     st.caption(f"{ticker}: No data")
         
@@ -487,9 +491,9 @@ with tab2:
             else:
                 return 'background-color: #4d1a1a; color: white'
         
-        styled_df = display_df.style.applymap(color_category, subset=['Category'])
+        styled_df = display_df.style.map(color_category, subset=['Category'])
         
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        st.dataframe(styled_df, width="stretch", hide_index=True)
         
         st.caption("""
         **How to Read Rankings:**
@@ -540,7 +544,7 @@ with tab2:
             margin=dict(l=0, r=0, t=20, b=0)
         )
         
-        st.plotly_chart(fig_seaf, use_container_width=True)
+        st.plotly_chart(fig_seaf, width="stretch")
         
         # Timeframe breakdown with color coding
         with st.expander("📋 View Timeframe Breakdown"):
@@ -573,15 +577,15 @@ with tab2:
                 return ''
             
             # Apply styling
-            styled_breakdown = breakdown_df.style.applymap(
+            styled_breakdown = breakdown_df.style.map(
                 color_rank, 
                 subset=['Trading', 'Tactical', 'Strategic', 'Long-term']
-            ).applymap(
+            ).map(
                 color_score,
                 subset=['Trading_Score', 'Tactical_Score', 'Strategic_Score', 'Long-term_Score']
             )
             
-            st.dataframe(styled_breakdown, use_container_width=True, hide_index=True)
+            st.dataframe(styled_breakdown, width="stretch", hide_index=True)
             
             st.caption("""
             **Timeframes:**
@@ -632,7 +636,7 @@ with tab2:
                     margin=dict(l=0, r=0, t=20, b=0)
                 )
                 
-                st.plotly_chart(fig_corr, use_container_width=True)
+                st.plotly_chart(fig_corr, width="stretch")
                 
                 st.caption("""
                 **How to interpret:**
@@ -695,7 +699,7 @@ with tab5:
         
         if yield_data is not None:
             fig_yield = render_yield_curve_chart(yield_data)
-            st.plotly_chart(fig_yield, use_container_width=True)
+            st.plotly_chart(fig_yield, width="stretch")
             
             last_spread = yield_data['Spread'].dropna().iloc[-1]
             if last_spread < 0:
@@ -711,7 +715,7 @@ with tab5:
         
         if perf_df is not None:
             fig_perf = render_intermarket_chart(perf_df)
-            st.plotly_chart(fig_perf, use_container_width=True)
+            st.plotly_chart(fig_perf, width="stretch")
             
             # Correlation Quick Check
             st.info("""
@@ -799,7 +803,7 @@ with tab3:
                                          name='SMA 200 (The Wind)', line=dict(color='white', width=3, dash='dash')))
                 
                 fig.update_layout(template="plotly_dark", height=600, margin=dict(l=0, r=0, t=0, b=0))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
             with audit_col:
                 st.subheader("⚙️ Mechanics Check")
@@ -1067,7 +1071,7 @@ with tab3:
                 fig_gamma.update_yaxes(title_text="Volume", row=2, col=1)
                 fig_gamma.update_xaxes(title_text="Strike Price ($)", row=2, col=1)
                 
-                st.plotly_chart(fig_gamma, use_container_width=True)
+                st.plotly_chart(fig_gamma, width="stretch")
                 
                 # Explanation
                 with st.expander("ℹ️ Understanding Gamma Exposure"):
@@ -1184,7 +1188,7 @@ with tab3:
                         if not flow_data['unusual_calls'].empty:
                             unusual_calls_display = flow_data['unusual_calls'][['strike', 'expiration', 'volume', 'openInterest', 'premium']].copy()
                             unusual_calls_display['premium'] = unusual_calls_display['premium'].apply(lambda x: f"${x:,.0f}")
-                            st.dataframe(unusual_calls_display, use_container_width=True, hide_index=True)
+                            st.dataframe(unusual_calls_display, width="stretch", hide_index=True)
                         else:
                             st.caption("None detected")
                     
@@ -1193,7 +1197,7 @@ with tab3:
                         if not flow_data['unusual_puts'].empty:
                             unusual_puts_display = flow_data['unusual_puts'][['strike', 'expiration', 'volume', 'openInterest', 'premium']].copy()
                             unusual_puts_display['premium'] = unusual_puts_display['premium'].apply(lambda x: f"${x:,.0f}")
-                            st.dataframe(unusual_puts_display, use_container_width=True, hide_index=True)
+                            st.dataframe(unusual_puts_display, width="stretch", hide_index=True)
                         else:
                             st.caption("None detected")
                     
@@ -1209,7 +1213,7 @@ with tab3:
                     if not flow_data['top_calls'].empty:
                         top_calls_display = flow_data['top_calls'].copy()
                         top_calls_display['premium'] = top_calls_display['premium'].apply(lambda x: f"${x:,.0f}")
-                        st.dataframe(top_calls_display, use_container_width=True, hide_index=True)
+                        st.dataframe(top_calls_display, width="stretch", hide_index=True)
                     else:
                         st.caption("No data")
                 
@@ -1218,7 +1222,7 @@ with tab3:
                     if not flow_data['top_puts'].empty:
                         top_puts_display = flow_data['top_puts'].copy()
                         top_puts_display['premium'] = top_puts_display['premium'].apply(lambda x: f"${x:,.0f}")
-                        st.dataframe(top_puts_display, use_container_width=True, hide_index=True)
+                        st.dataframe(top_puts_display, width="stretch", hide_index=True)
                     else:
                         st.caption("No data")
                 
@@ -1363,7 +1367,7 @@ with tab4:
                 color_party, subset=['Party']
             )
             
-            st.dataframe(styled_trades, use_container_width=True, hide_index=True)
+            st.dataframe(styled_trades, width="stretch", hide_index=True)
         
         with ticker_col:
             st.subheader("Most Traded Tickers")
@@ -1417,7 +1421,7 @@ with tab4:
             if not overlap.empty:
                 st.success(f"Found {len(overlap)} Congressional trade(s) matching your watchlist!")
                 st.dataframe(overlap[['date', 'member', 'party', 'ticker', 'transaction', 'amount']], 
-                            use_container_width=True, hide_index=True)
+                            width="stretch", hide_index=True)
             else:
                 st.info("No Congressional trades match your watchlist tickers.")
         
