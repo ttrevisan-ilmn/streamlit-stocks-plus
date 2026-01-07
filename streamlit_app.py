@@ -1023,8 +1023,8 @@ with tab6:
                 fig_gamma.update_layout(template="plotly_dark", height=400)
                 # Update axis titles
                 fig_gamma.update_layout(showlegend=False)
-                fig_gamma.update_yaxes(title_text="Gamma ($M)", row=1, col=1)
-                fig_gamma.update_xaxes(title_text="Strike Price ($)", row=1, col=1)
+                fig_gamma.update_yaxes(title_text="Gamma ($M)")
+                fig_gamma.update_xaxes(title_text="Strike Price ($)")
                 
                 # Add spot line
                 fig_gamma.add_vline(x=spot, line_dash="dash", line_color="white", annotation_text="Spot")
@@ -1050,8 +1050,8 @@ with tab6:
                         marker_color='#ef4444'
                     ))
                 fig_vol.update_layout(template="plotly_dark", height=400, barmode='stack')
-                fig_vol.update_yaxes(title_text="Volume", row=1, col=1)
-                fig_vol.update_xaxes(title_text="Strike Price ($)", row=1, col=1)
+                fig_vol.update_yaxes(title_text="Volume")
+                fig_vol.update_xaxes(title_text="Strike Price ($)")
                 fig_vol.add_vline(x=spot, line_dash="dash", line_color="white", annotation_text="Spot")
                 
                 st.plotly_chart(fig_vol, width="stretch")
