@@ -68,15 +68,24 @@ class TestCoreModules(unittest.TestCase):
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "members": [
-                {"name": "Test Rep", "partyName": "D", "state": "CA", "bioguideId": "T001"}
+                # Standard List Case
+                {"name": "Test Rep", "partyName": "D", "state": "CA", "bioguideId": "T001", "terms": [{"chamber": "House"}]},
+                # Weird Dict Case (which caused KeyError -1)
+                {"name": "Dict Rep", "terms": {"chamber": "Senate"}}, 
+                # Empty Case
+                {"name": "Empty Rep", "terms": []}
             ]
         }
         mock_get.return_value = mock_response
         
         result = fetch_congress_members(api_key="GOOD_KEY")
         self.assertFalse(result.empty)
-        self.assertIn('name', result.columns)
-        self.assertEqual(result.iloc[0]['name'], "Test Rep")
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result.iloc[0]['chamber'], "House")
+        # Ensure Dict case is handled (returns Senate, not error)
+        self.assertEqual(result.iloc[1]['chamber'], "Senate")
+        # Ensure Empty case is safe
+        self.assertIsNone(result.iloc[2]['chamber'])
 
     @patch('seaf_model.fetch_sector_data')
     def test_seaf_model_structure(self, mock_fetch):

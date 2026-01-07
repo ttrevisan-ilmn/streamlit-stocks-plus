@@ -43,13 +43,21 @@ def fetch_congress_members(api_key=None):
             # Parse into DataFrame
             records = []
             for member in members:
+                # Parse terms safely
+                terms = member.get('terms')
+                chamber = None
+                if isinstance(terms, list) and terms:
+                    chamber = terms[-1].get('chamber')
+                elif isinstance(terms, dict):
+                    chamber = terms.get('chamber')
+
                 records.append({
                     'bioguideId': member.get('bioguideId'),
                     'name': member.get('name'),
                     'party': member.get('partyName'),
                     'state': member.get('state'),
                     'district': member.get('district'),
-                    'chamber': member.get('terms', [{}])[-1].get('chamber') if member.get('terms') else None
+                    'chamber': chamber
                 })
             
             return pd.DataFrame(records)
