@@ -27,6 +27,27 @@ def get_tv_symbol(ticker):
     # Default assumption for stocks (imperfect but fast)
     return f"NASDAQ:{ticker}"
 
+def render_mini_chart_html(symbol, description):
+    """Generates HTML for TradingView Mini Chart widget."""
+    return f"""
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+  {{
+  "symbol": "{symbol}",
+  "width": "100%",
+  "height": "100%",
+  "locale": "en",
+  "dateRange": "12M",
+  "colorTheme": "dark",
+  "isTransparent": false,
+  "autosize": true,
+  "largeChartUrl": ""
+}}
+  </script>
+</div>
+"""
+
 # --- API CALL COUNTER WITH PERSISTENCE ---
 import json
 import os
@@ -177,114 +198,27 @@ with st.sidebar.expander("⚙️ Settings"):
         st.warning("No API key found.")
         st.markdown("[Get a free key](https://api.congress.gov/sign-up/)")
 
-# --- HEADER: TRADINGVIEW TICKER TAPE ---
-components.html("""
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
-  {
-  "symbols": [
-    {
-      "proName": "FOREXCOM:SPXUSD",
-      "title": "S&P 500"
-    },
-    {
-      "proName": "FOREXCOM:NSXUSD",
-      "title": "Nasdaq 100"
-    },
-    {
-      "proName": "FOREXCOM:DJI",
-      "title": "Dow 30"
-    },
-    {
-      "proName": "FX:EURUSD",
-      "title": "EUR/USD"
-    },
-    {
-      "proName": "BITSTAMP:BTCUSD",
-      "title": "Bitcoin"
-    },
-    {
-      "proName": "CMCMARKETS:GOLD",
-      "title": "Gold"
-    }
-  ],
-  "showSymbolLogo": true,
-  "colorTheme": "dark",
-  "isTransparent": false,
-  "displayMode": "adaptive",
-  "locale": "en"
-}
-  </script>
-</div>
-""", height=50)
+# --- HEADER: TICKER TAPE REMOVED (Replaced by Grid in Tab 1) ---
 
 # --- MAIN TABS ---
 tab1, tab2, tab5, tab3, tab4, tab6 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades", "🌪️ Options Flow"])
 
 # --- TAB 1: MARKET HEALTH DASHBOARD ---
 with tab1:
-    st.subheader("Market Overview")
-    components.html("""
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
-  {
-  "symbols": [
-    [
-      "Apple",
-      "NASDAQ:AAPL|1D"
-    ],
-    [
-      "Google",
-      "NASDAQ:GOOGL|1D"
-    ],
-    [
-      "Microsoft",
-      "NASDAQ:MSFT|1D"
-    ],
-    [
-      "S&P 500",
-      "FOREXCOM:SPXUSD|1D"
-    ]
-  ],
-  "chartOnly": false,
-  "width": "100%",
-  "height": "100%",
-  "locale": "en",
-  "colorTheme": "dark",
-  "autosize": true,
-  "showVolume": false,
-  "showMA": false,
-  "hideDateRanges": false,
-  "hideMarketStatus": false,
-  "hideSymbolLogo": false,
-  "scalePosition": "right",
-  "scaleMode": "Normal",
-  "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-  "fontSize": "10",
-  "noTimeScale": false,
-  "valuesTracking": "1",
-  "changeMode": "price-and-percent",
-  "chartType": "area",
-  "maLineColor": "#2962FF",
-  "maLineWidth": 1,
-  "maLength": 9,
-  "lineWidth": 2,
-  "lineType": 0,
-  "dateRanges": [
-    "1d|1",
-    "1m|30",
-    "3m|60",
-    "12m|1D",
-    "60m|1W",
-    "all|1M"
-  ]
-}
-  </script>
-</div>
-    """, height=500)
+    st.subheader("Market Snapshot")
+    # Grid Layout for Indices
+    mc1, mc2, mc3 = st.columns(3)
+    with mc1:
+        components.html(render_mini_chart_html("FOREXCOM:SPXUSD", "S&P 500"), height=220)
+        components.html(render_mini_chart_html("FX:EURUSD", "EUR/USD"), height=220)
+    with mc2:
+        components.html(render_mini_chart_html("FOREXCOM:NSXUSD", "Nasdaq 100"), height=220)
+        components.html(render_mini_chart_html("BITSTAMP:BTCUSD", "Bitcoin"), height=220)
+    with mc3:
+        components.html(render_mini_chart_html("FOREXCOM:DJI", "Dow 30"), height=220)
+        components.html(render_mini_chart_html("CMCMARKETS:GOLD", "Gold"), height=220)
     
+    st.divider()
     st.title("📊 Market Health Gauge (A6)")
     st.markdown("""
     The Asbury 6 is a quantitative, daily gauge of US equity market internal strength based on six key metrics.
@@ -1015,8 +949,13 @@ with tab3:
                 
                 st.divider()
                 st.subheader("📚 Advanced Financials (TradingView)")
-                tv_symbol = get_tv_symbol(ticker)
-                components.html(f"""
+                
+                # Check for Equity type (Financials not available for ETFs/Crypto usually)
+                q_type = fund_data.get('quote_type', '').upper() if fund_data else ''
+                
+                if 'EQUITY' in q_type:
+                    tv_symbol = get_tv_symbol(ticker)
+                    components.html(f"""
 <div class="tradingview-widget-container">
   <div class="tradingview-widget-container__widget"></div>
   <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
@@ -1031,7 +970,9 @@ with tab3:
 }}
   </script>
 </div>
-                """, height=500)
+                    """, height=500)
+                else:
+                    st.info(f"Financials widget is typically available for Equities. Current asset type: {q_type or 'Unknown'}")
                     
             else:
                 st.warning("Could not fetch fundamental data.")

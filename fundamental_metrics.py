@@ -16,6 +16,8 @@ def fetch_fundamental_data(ticker):
         
         # Extract key metrics with safe defaults
         metrics = {
+            'quote_type': info.get('quoteType'),
+            'long_name': info.get('longName'),
             'market_cap': info.get('marketCap', 0),
             'enterprise_value': info.get('enterpriseValue', 0),
             'pe_ratio': info.get('trailingPE', 0),
