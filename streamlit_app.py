@@ -131,8 +131,60 @@ st.markdown("""
 
 st.sidebar.title("Phinancial Terminal")
 
-# Ticker input
-ticker = st.sidebar.text_input("Enter Ticker:", value="SPY", placeholder="e.g. SPY, AAPL").upper()
+# --- TICKER SELECTION ---
+@st.cache_data
+def get_ticker_options():
+    # Common ETFs/Indices not in S&P 500 list
+    etfs = [
+        "SPY - SPDR S&P 500 ETF Trust",
+        "QQQ - Invesco QQQ Trust",
+        "IWM - iShares Russell 2000 ETF",
+        "DIA - SPDR Dow Jones Industrial Average ETF",
+        "GLD - SPDR Gold Shares",
+        "SLV - iShares Silver Trust",
+        "TLT - iShares 20+ Year Treasury Bond ETF",
+        "VIX - CBOE Volatility Index", 
+        "HYG - iShares iBoxx $ High Yield Corp Bond ETF",
+        "LQD - iShares iBoxx $ Inv Grade Corp Bond ETF",
+        "SMH - VanEck Semiconductor ETF",
+        "XLE - Energy Select Sector SPDR Fund",
+        "XLF - Financial Select Sector SPDR Fund",
+        "XLK - Technology Select Sector SPDR Fund",
+        "XLV - Health Care Select Sector SPDR Fund"
+    ]
+    
+    try:
+        # Load S&P 500 constituents
+        df = pd.read_csv('tickers.csv')
+        # Format: "AAPL - Apple Inc."
+        stocks = (df['Symbol'] + " - " + df['Security']).tolist()
+        return etfs + sorted(stocks)
+    except:
+        return etfs # Fallback if csv missing
+
+ticker_options = get_ticker_options()
+# Smart Default: Try to find SPY, else index 0
+default_index = 0
+if ticker_options:
+    for i, opt in enumerate(ticker_options):
+        if opt.startswith("SPY"):
+            default_index = i
+            break
+
+selected_option = st.sidebar.selectbox(
+    "Select Ticker:", 
+    options=ticker_options + ["Other..."], 
+    index=default_index,
+    help="Type to search supported S&P 500 stocks and ETFs."
+)
+
+if selected_option == "Other...":
+    ticker = st.sidebar.text_input("Enter Custom Ticker:", value="NVDA").upper()
+else:
+    ticker = selected_option.split(" - ")[0]
+
+# Sanitize for yfinance (BRK.B -> BRK-B)
+ticker = ticker.replace('.', '-')
 
 # --- WATCHLIST ---
 if 'watchlist' not in st.session_state:
