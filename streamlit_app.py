@@ -144,13 +144,20 @@ def get_ticker_options():
         "SLV - iShares Silver Trust",
         "TLT - iShares 20+ Year Treasury Bond ETF",
         "VIX - CBOE Volatility Index", 
-        "HYG - iShares iBoxx $ High Yield Corp Bond ETF",
-        "LQD - iShares iBoxx $ Inv Grade Corp Bond ETF",
-        "SMH - VanEck Semiconductor ETF",
+        "XLC - Communication Services Select Sector SPDR Fund",
+        "XLY - Consumer Discretionary Select Sector SPDR Fund",
+        "XLP - Consumer Staples Select Sector SPDR Fund",
         "XLE - Energy Select Sector SPDR Fund",
         "XLF - Financial Select Sector SPDR Fund",
+        "XLV - Health Care Select Sector SPDR Fund",
+        "XLI - Industrial Select Sector SPDR Fund",
+        "XLB - Materials Select Sector SPDR Fund",
+        "XLRE - Real Estate Select Sector SPDR Fund",
         "XLK - Technology Select Sector SPDR Fund",
-        "XLV - Health Care Select Sector SPDR Fund"
+        "XLU - Utilities Select Sector SPDR Fund",
+        "SMH - VanEck Semiconductor ETF",
+        "HYG - iShares iBoxx $ High Yield Corp Bond ETF",
+        "LQD - iShares iBoxx $ Inv Grade Corp Bond ETF"
     ]
     
     try:
@@ -163,18 +170,20 @@ def get_ticker_options():
         return etfs # Fallback if csv missing
 
 ticker_options = get_ticker_options()
-# Smart Default: Try to find SPY, else index 0
-default_index = 0
-if ticker_options:
-    for i, opt in enumerate(ticker_options):
-        if opt.startswith("SPY"):
-            default_index = i
-            break
+# Smart Default: Initialize Session State to SPY if not set
+if "ticker_selector" not in st.session_state:
+    default_idx = 0
+    if ticker_options:
+        for i, opt in enumerate(ticker_options):
+            if opt.startswith("SPY"):
+                default_idx = i
+                break
+        st.session_state.ticker_selector = ticker_options[default_idx]
 
 selected_option = st.sidebar.selectbox(
     "Select Ticker:", 
     options=ticker_options + ["Other..."], 
-    index=default_index,
+    key="ticker_selector",
     help="Type to search supported S&P 500 stocks and ETFs."
 )
 
@@ -1022,7 +1031,7 @@ with tab3:
 }}
   </script>
 </div>
-                    """, height=500)
+                    """, height=500, key=f"tv_fin_{ticker}")
                 else:
                     st.info(f"Financials widget is typically available for Equities. Current asset type: {q_type or 'Unknown'}")
                     
@@ -1196,6 +1205,8 @@ with tab6:
         
         if not flow_data:
             st.warning("No flow data available.")
+        elif 'error' in flow_data:
+            st.warning(f"Could not retrieve options flow: {flow_data.get('error')}")
         else:
             # Metrics
             f1, f2, f3 = st.columns(3)
