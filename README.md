@@ -6,7 +6,7 @@ A comprehensive quantitative research platform built with Streamlit, integrating
 
 ## 🚀 Key Features
 
-The terminal is organized into five specialized modules:
+The terminal is organized into ten specialized modules:
 
 ### 1. 📊 Market Health (Asbury 6)
 A quantitative daily gauge of US equity market internal strength.
@@ -20,24 +20,54 @@ The **Sector ETF Asset Flows (SEAF)** model ranks all 11 Select Sector SPDR ETFs
 - **Actionable**: Highlights the **Top 3 Sectors** for immediate allocation.
 - **Visualization**: Correlation heatmaps and score rankings.
 
-### 3. 🌐 Intermarket Analysis
-Macro-level context for equity decisions.
-- **Yield Curve**: Visualizes 10Y-3M spread to detect recession warnings (Contango vs Backwardation).
-- **Commodities & Forex**: Dashboard for Oil, Gold, Bitcoin, and DXY.
-- **Asset Performance**: Normalized comparison of major asset classes over the last year.
-
-### 4. 📉 Stock Analysis (The Core IO)
-A deep-dive scanner for individual tickers.
-- **Mphinancial Verdict**: Technical audit (EMAs, SMA200, ADX, ATR Key Levels) to identify "High Quality Setups".
+### 3. 📉 Stock Analysis (The Core IO)
+A deep-dive scanner for individual tickers with a **Consolidated Strategy Dashboard**.
+- **Unified Verdict**: Instantly view Power Gauge, Weinstein Stage, and CANSLIM scores.
 - **Fundamental Health**: ROIC-style dashboard (ROIC, FCF, Margins, Valuation) powered by yfinance.
-- **Gamma & Volume Profile**: Analysis of options dealer positioning (GEX) and support/resistance levels.
-- **Options Flow**: Net premium tracking, unusual activity scanner, and Put/Call ratios.
+- **Advanced Financials**: Interactive 1400px TradingView widget for balance sheet analysis.
+- **Technical Audit**: EMAs, SMA200, ADX, ATR Key Levels.
 
-### 5. 🏛️ Congressional Trading
+### 4. 🏛️ Imperial Senate (Congressional Trading)
 Track the "Smart Money" in Washington using the STOCK Act disclosures.
 - **Recent Trades**: Sortable table of latest filings by House/Senate members.
 - **Leaderboard**: Top traded tickers and most active politicians.
 - **Watchlist Check**: Automatically flags if your watchlist stocks are being bought/sold by Congress.
+
+### 5. 🌪️ Options Flow (Gamma & Sentiment)
+Dedicated dashboard for institutional options activity.
+- **Gamma Exposure (GEX)**: Profile of dealer positioning and key levels.
+- **Net Flow**: Put/Call Premium balance and sentiment analysis.
+- **Unusual Activity**: Real-time scanner for high-volume options trades.
+- **Vol Analysis**: IV Rank vs. Historical Volatility comparison.
+
+### 6. 🔍 Stock Screener (Strategy Presets)
+Filter the S&P 500 universe for high-probability setups.
+- **Presets**: Cash Secured Puts (CSP), Covered Calls (CC), Momentum (Long/Short), Safe Longs.
+- **Filters**: Customize by Market Cap, Beta, RSI, P/E, and Yield.
+- **Export**: Table results are sortable and interactive.
+
+### 7. ⚡ Power Gauge Rating
+A 20-Factor Model analyzing Financials, Earnings, Technicals, and Experts.
+- **Scoring**: 0-100 Bullish/Bearish rating.
+- **Components**: Breakdowns for Debt/Equity, Earnings Growth, Relative Strength, and Insider Activity.
+- **Visuals**: Radar charts and progress bars for factor contribution.
+
+### 8. 📉 Weinstein Stage Analysis
+Automated stage identification based on Stan Weinstein's methodology.
+- **4 Stages**: Basing, Advancing, Topping, Declining.
+- **Indicators**: 30-week SMA slope and Mansfield Relative Strength (RS).
+- **Education**: Built-in methodology tooltips explaining the lifecycle.
+
+### 9. 🚀 CANSLIM Growth Strategy
+Implementation of William O'Neil's growth investing checklist.
+- **7-Factor Model**: Current Earnings, Annual Earnings, New Highs, Supply, Leader, Institutions, Market.
+- **Scorecard**: Pass/Fail metrics for each criteria with detailed explanations.
+
+### 10. 🌐 Intermarket Analysis
+Macro-level context for equity decisions.
+- **Yield Curve**: Visualizes 10Y-3M spread to detect recession warnings.
+- **Commodities & Forex**: Dashboard for Oil, Gold, Bitcoin, and DXY.
+- **Asset Performance**: Normalized comparison of major asset classes.
 
 ---
 
@@ -77,4 +107,4 @@ Track the "Smart Money" in Washington using the STOCK Act disclosures.
 - **No External Tracking**: All data fetching happens directly from your machine to the data providers (Yahoo Finance, Congress.gov).
 
 ## ⚠️ Disclaimer
-This tool is for educational and research purposes only. It is not financial advice. 
+This tool is for educational and research purposes only. It is not financial advice.
