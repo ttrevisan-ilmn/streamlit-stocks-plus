@@ -25,115 +25,152 @@ def get_screener_universe():
 def fetch_screener_data(tickers):
     """
     Batch fetch fundamental and price data for screener.
+    Refactored to use chunking and synchronous calls to prevent "Too many open files" error.
     """
     if not tickers:
         return pd.DataFrame()
-        
-    try:
-        yq = Ticker(tickers, asynchronous=True)
-        
-        # 1. Fetch Fundamentals (Key Stats & Summary Detail)
-        summary = yq.summary_detail
-        stats = yq.key_stats
-        price = yq.price
-        
-        # Convert to DataFrames
-        df_summary = pd.DataFrame(summary).T
-        df_stats = pd.DataFrame(stats).T
-        df_price = pd.DataFrame(price).T
-        
-        # Merge key fields
-        # structure: index is symbol
-        data = pd.DataFrame(index=tickers)
-        
-        # Helper to safely extract column
-        def safe_extract(df, col):
-            if col in df.columns:
-                return df[col]
-            return pd.Series(index=df.index)
 
-        # Helper to safely extract numeric
-        def safe_extract_numeric(df, col):
-            series = safe_extract(df, col)
-            return pd.to_numeric(series, errors='coerce')
+    CHUNK_SIZE = 50
+    all_data = []
+    
+    # Progress bar for long operations
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    total_chunks = (len(tickers) + CHUNK_SIZE - 1) // CHUNK_SIZE
 
-        data['Price'] = safe_extract_numeric(df_price, 'regularMarketPrice')
-        data['MarketCap'] = safe_extract_numeric(df_summary, 'marketCap')
-        data['Beta'] = safe_extract_numeric(df_stats, 'beta')
-        data['PE'] = safe_extract_numeric(df_summary, 'trailingPE')
-        data['DivYield'] = safe_extract_numeric(df_summary, 'dividendYield')
-        data['Volume'] = safe_extract_numeric(df_summary, 'volume')
-        data['AvgVol'] = safe_extract_numeric(df_summary, 'averageVolume')
-        data['Sector'] = safe_extract(df_summary, 'section') # Might differ
+    for i in range(0, len(tickers), CHUNK_SIZE):
+        chunk = tickers[i:i + CHUNK_SIZE]
+        current_chunk_idx = i // CHUNK_SIZE + 1
+        status_text.text(f"Scanning batch {current_chunk_idx}/{total_chunks}...")
+        progress_bar.progress(current_chunk_idx / total_chunks)
         
-        # 2. Fetch History for Technicals (Trend, RSI, Volatility)
-        # Using yfinance for history as it handles multi-ticker adjusted close well
-        # Download last 6 months to safe bandwidth
-        hist_data = yf.download(tickers, period="6mo", interval="1d", group_by='ticker', progress=False, threads=True)
-        
-        # Calculate Technicals per ticker
-        tech_data = {
-            'RSI': {},
-            'SMA20': {},
-            'SMA50': {},
-            'SMA200': {},
-            'HV_20': {}, # Historical Volatility
-            'Trend_50': {}, # Price vs SMA50
-            'Trend_200': {} # Price vs SMA200
-        }
-        
-        for ticker in tickers:
-            try:
-                # Handle MultiIndex
-                if isinstance(hist_data.columns, pd.MultiIndex):
-                    df_t = hist_data[ticker].copy()
-                else:
-                    # Single ticker case
-                    df_t = hist_data.copy()
-                
-                if df_t.empty: continue
-                
-                # Cleanup
-                df_t = df_t.dropna(subset=['Close'])
-                if len(df_t) < 50: continue
-                
-                close = df_t['Close']
-                
-                # RSI
-                delta = close.diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                rs = gain / loss
-                rsi = 100 - (100 / (1 + rs))
-                tech_data['RSI'][ticker] = rsi.iloc[-1]
-                
-                # SMAs
-                tech_data['SMA20'][ticker] = close.rolling(window=20).mean().iloc[-1]
-                tech_data['SMA50'][ticker] = close.rolling(window=50).mean().iloc[-1]
-                tech_data['SMA200'][ticker] = close.rolling(window=200).mean().iloc[-1]
-                
-                # Historical Volatility (20D)
-                log_ret = np.log(close / close.shift(1))
-                hv = log_ret.rolling(window=20).std().iloc[-1] * np.sqrt(252) * 100
-                tech_data['HV_20'][ticker] = hv
-                
-                curr_price = close.iloc[-1]
-                tech_data['Trend_50'][ticker] = "Up" if curr_price > tech_data['SMA50'][ticker] else "Down"
-                tech_data['Trend_200'][ticker] = "Up" if (len(df_t) > 200 and curr_price > tech_data['SMA200'][ticker]) else "Down"
-                
-            except Exception:
-                continue
-                
-        # Merge Technicals
-        data['RSI'] = pd.Series(tech_data['RSI'])
-        data['SMA50'] = pd.Series(tech_data['SMA50'])
-        data['SMA200'] = pd.Series(tech_data['SMA200'])
-        data['HV_20'] = pd.Series(tech_data['HV_20'])
-        
-        return data.dropna(subset=['Price']) # Remove empty rows
-    except Exception as e:
-        print(f"Screener data error: {e}")
+        try:
+            # 1. Fetch Fundamentals (Synchronous to save file descriptors)
+            # Remove asynchronous=True to avoid OSError: Too many open files
+            yq = Ticker(chunk, asynchronous=False) 
+            
+            summary = yq.summary_detail
+            stats = yq.key_stats
+            price = yq.price
+            
+            # Convert to DataFrames
+            df_summary = pd.DataFrame(summary).T
+            df_stats = pd.DataFrame(stats).T
+            df_price = pd.DataFrame(price).T
+            
+            # Merge key fields
+            chunk_data = pd.DataFrame(index=chunk)
+            
+            # Helper to safely extract column
+            def safe_extract(df, col):
+                if col in df.columns:
+                    return df[col]
+                return pd.Series(index=df.index)
+
+            # Helper to safely extract numeric
+            def safe_extract_numeric(df, col):
+                series = safe_extract(df, col)
+                return pd.to_numeric(series, errors='coerce')
+
+            chunk_data['Price'] = safe_extract_numeric(df_price, 'regularMarketPrice')
+            chunk_data['MarketCap'] = safe_extract_numeric(df_summary, 'marketCap')
+            chunk_data['Beta'] = safe_extract_numeric(df_stats, 'beta')
+            chunk_data['PE'] = safe_extract_numeric(df_summary, 'trailingPE')
+            chunk_data['DivYield'] = safe_extract_numeric(df_summary, 'dividendYield')
+            chunk_data['Volume'] = safe_extract_numeric(df_summary, 'volume')
+            chunk_data['AvgVol'] = safe_extract_numeric(df_summary, 'averageVolume')
+            chunk_data['Sector'] = safe_extract(df_summary, 'section')
+            
+            # 2. Fetch History for Technicals (Trend, RSI, Volatility)
+            # Using yfinance for history as it handles multi-ticker adjusted close well
+            # Download last 6 months to safe bandwidth
+            hist_data = yf.download(chunk, period="6mo", interval="1d", group_by='ticker', progress=False, threads=False) # Disable threads for safety
+            
+            # Calculate Technicals per ticker
+            tech_data = {
+                'RSI': {},
+                'SMA20': {},
+                'SMA50': {},
+                'SMA200': {},
+                'HV_20': {}, # Historical Volatility
+                'Trend_50': {}, # Price vs SMA50
+                'Trend_200': {} # Price vs SMA200
+            }
+            
+            for ticker in chunk:
+                try:
+                    # Handle MultiIndex
+                    if isinstance(hist_data.columns, pd.MultiIndex):
+                        if ticker in hist_data.columns.get_level_values(0):
+                             df_t = hist_data[ticker].copy()
+                        else:
+                            continue
+                    else:
+                        # Single ticker case (if chunk has only 1 item)
+                        df_t = hist_data.copy()
+                    
+                    if df_t.empty: continue
+                    
+                    # Cleanup
+                    df_t = df_t.dropna(subset=['Close'])
+                    if len(df_t) < 50: continue
+                    
+                    close = df_t['Close']
+                    if isinstance(close, pd.DataFrame): close = close.iloc[:, 0] # Handle rare duplicate col case
+
+                    # RSI
+                    delta = close.diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    rs = gain / loss
+                    rsi = 100 - (100 / (1 + rs))
+                    tech_data['RSI'][ticker] = rsi.iloc[-1]
+                    
+                    # SMAs
+                    tech_data['SMA20'][ticker] = close.rolling(window=20).mean().iloc[-1]
+                    tech_data['SMA50'][ticker] = close.rolling(window=50).mean().iloc[-1]
+                    tech_data['SMA200'][ticker] = close.rolling(window=200).mean().iloc[-1]
+                    
+                    # Historical Volatility (20D)
+                    log_ret = np.log(close / close.shift(1))
+                    hv = log_ret.rolling(window=20).std().iloc[-1] * np.sqrt(252) * 100
+                    tech_data['HV_20'][ticker] = hv
+                    
+                    curr_price = close.iloc[-1]
+                    tech_data['Trend_50'][ticker] = "Up" if curr_price > tech_data['SMA50'][ticker] else "Down"
+                    # Safe check for SMA200 existence
+                    sma200_val = tech_data['SMA200'].get(ticker)
+                    if sma200_val and not pd.isna(sma200_val):
+                         tech_data['Trend_200'][ticker] = "Up" if curr_price > sma200_val else "Down"
+                    else:
+                         tech_data['Trend_200'][ticker] = "Down"
+                    
+                except Exception:
+                    continue
+                    
+            # Merge Technicals into chunk_data
+            chunk_data['RSI'] = pd.Series(tech_data['RSI'])
+            chunk_data['SMA50'] = pd.Series(tech_data['SMA50'])
+            chunk_data['SMA200'] = pd.Series(tech_data['SMA200'])
+            chunk_data['HV_20'] = pd.Series(tech_data['HV_20'])
+            
+            all_data.append(chunk_data)
+            
+        except Exception as e:
+            print(f"Error processing chunk {current_chunk_idx}: {e}")
+            continue
+            
+    # Cleanup UI
+    progress_bar.empty()
+    status_text.empty()
+    
+    if not all_data:
         return pd.DataFrame()
+        
+    # Combine all chunks
+    full_df = pd.concat(all_data)
+    return full_df.dropna(subset=['Price'])
 
 def apply_strategy(df, strategy):
     """
