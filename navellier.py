@@ -50,7 +50,7 @@ def calculate_fundamental_grade(info):
         ratio = tpe / fpe # > 1 implies forward earnings are expected to be higher
     metrics['Earnings Momentum'] = {
         'value': ratio,
-        'score': normalize(ratio, 0.8, 1.5) if ratio is else normalize(info.get('pegRatio'), 0.5, 2, invert=True)
+        'score': normalize(ratio, 0.8, 1.5) if ratio is not None else normalize(info.get('pegRatio'), 0.5, 2, invert=True)
     }
     
     # 5. Earnings Surprises (Proxy: EPS growth trend / general EPS momentum)
