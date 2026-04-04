@@ -23,29 +23,24 @@ def get_screener_universe():
         # Fallback to a smaller list if file missing
         return ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "UNH", "JNJ"]
 
-@st.cache_data(ttl=3600*4) # Cache for 4 hours
+@st.cache_data(ttl=3600*6) # Cache for 6 hours
 def fetch_screener_data(tickers, limit=None):
     """
-    Batch fetch fundamental and price data for screener.
-    Refactored to use chunking and synchronous calls to prevent "Too many open files" error.
+    Batch fetch fundamental + price + technical data for screener.
+    Optimized: 2 yahooquery calls per chunk, 3mo history, threading enabled.
     """
     if not tickers:
         return pd.DataFrame()
 
-    # Apply limit if specified (e.g. for Quick Scan)
     if limit:
         tickers = tickers[:limit]
 
-    CHUNK_SIZE = 20 # Reduced from 50 to 20 for more frequent updates and stability
+    CHUNK_SIZE = 50  # Larger chunks = fewer round trips
     all_data = []
     
-    # Progress bar for long operations
     progress_bar = st.progress(0)
     status_text = st.empty()
-    
     total_chunks = (len(tickers) + CHUNK_SIZE - 1) // CHUNK_SIZE
-    
-    import time
 
     for i in range(0, len(tickers), CHUNK_SIZE):
         chunk = tickers[i:i + CHUNK_SIZE]
@@ -54,181 +49,134 @@ def fetch_screener_data(tickers, limit=None):
         progress_bar.progress(current_chunk_idx / total_chunks)
         
         try:
-            # Sleep briefly to be nice to APIs and avoid rate limits
-            time.sleep(0.2)
+            # --- STEP 1: Single yahooquery call with 2 modules (not 4) ---
+            # financial_data covers: price, ROE, margins, growth, recommendations
+            # key_stats covers: beta, float, PE, marketcap
+            yq = Ticker(chunk, asynchronous=False)
+            financials = yq.financial_data   # ROE, margins, growth, price, recs
+            stats = yq.key_stats             # beta, float, PE, earningsQuarterlyGrowth
             
-            # 1. Fetch Fundamentals (Synchronous to save file descriptors)
-            # Remove asynchronous=True to avoid OSError: Too many open files
-            yq = Ticker(chunk, asynchronous=False) 
-            
-            summary = yq.summary_detail
-            stats = yq.key_stats
-            price = yq.price
-            
-            # Convert to DataFrames
-            df_summary = pd.DataFrame(summary).T
+            df_fin = pd.DataFrame(financials).T
             df_stats = pd.DataFrame(stats).T
-            df_price = pd.DataFrame(price).T
-            
-            # Merge key fields
-            chunk_data = pd.DataFrame(index=chunk)
-            
-            # Helper to safely extract column
-            def safe_extract(df, col):
+
+            # Helper to safely extract numeric from df
+            def safe_num(df, col):
                 if col in df.columns:
-                    return df[col]
-                return pd.Series(index=df.index)
+                    return pd.to_numeric(df[col], errors='coerce')
+                return pd.Series(dtype=float, index=df.index)
 
-            # Helper to safely extract numeric
-            def safe_extract_numeric(df, col):
-                series = safe_extract(df, col)
-                return pd.to_numeric(series, errors='coerce')
+            chunk_data = pd.DataFrame(index=chunk)
+            chunk_data['Price']     = safe_num(df_fin, 'currentPrice')
+            chunk_data['MarketCap'] = safe_num(df_stats, 'enterpriseValue')
+            chunk_data['Beta']      = safe_num(df_stats, 'beta')
+            chunk_data['PE']        = safe_num(df_stats, 'forwardPE')
+            chunk_data['Float']     = safe_num(df_stats, 'floatShares')
+            chunk_data['DivYield']  = safe_num(df_stats, 'lastDividendValue')
+            chunk_data['AvgVol']    = safe_num(df_stats, 'sharesOutstanding')  # Approximation if vol missing
+            # Navellier Fundamentals
+            chunk_data['ROE']       = safe_num(df_fin, 'returnOnEquity')
+            chunk_data['OpMargin']  = safe_num(df_fin, 'operatingMargins')
+            chunk_data['RevGrowth'] = safe_num(df_fin, 'revenueGrowth')
+            chunk_data['EarnGrowth']= safe_num(df_fin, 'earningsGrowth')
+            # Analyst
+            chunk_data['AnalystRec']= safe_num(df_fin, 'recommendationMean')
+            # Earnings growth from key_stats
+            chunk_data['EQGrowth']  = safe_num(df_stats, 'earningsQuarterlyGrowth')
+            
+            # --- STEP 2: Historical Data for Technicals (3 months, threaded) ---
+            hist_data = yf.download(
+                chunk, period="3mo", interval="1d",
+                group_by='ticker', progress=False,
+                threads=True,    # Use threading for parallel downloads
+                auto_adjust=True
+            )
+            
+            rsi_d, sma50_d, sma200_d, hv_d = {}, {}, {}, {}
+            ema8_d, ema21_d, ema34_d, ema55_d, ema89_d = {}, {}, {}, {}, {}
+            adx_d, stochk_d = {}, {}
+            vol_d, change_d = {}, {}
 
-            chunk_data['Price'] = safe_extract_numeric(df_price, 'regularMarketPrice')
-            chunk_data['MarketCap'] = safe_extract_numeric(df_summary, 'marketCap')
-            chunk_data['Beta'] = safe_extract_numeric(df_stats, 'beta')
-            chunk_data['PE'] = safe_extract_numeric(df_summary, 'trailingPE')
-            chunk_data['DivYield'] = safe_extract_numeric(df_summary, 'dividendYield')
-            chunk_data['Volume'] = safe_extract_numeric(df_summary, 'volume')
-            chunk_data['AvgVol'] = safe_extract_numeric(df_summary, 'averageVolume')
-            chunk_data['Sector'] = safe_extract(df_summary, 'section')
-            # New Metrics for Day Trade / Tao Bull
-            chunk_data['Float'] = safe_extract_numeric(df_stats, 'floatShares')
-            chunk_data['Change%'] = safe_extract_numeric(df_price, 'regularMarketChangePercent') * 100 # Convert to %
-            chunk_data['PreMkt%'] = safe_extract_numeric(df_price, 'preMarketChangePercent') * 100
-            
-            # Navellier Metrics
-            chunk_data['ROE'] = safe_extract_numeric(df_stats, 'returnOnEquity')
-            chunk_data['OpMargin'] = safe_extract_numeric(df_stats, 'operatingMargins')
-            chunk_data['RevGrowth'] = safe_extract_numeric(df_stats, 'revenueGrowth')
-            chunk_data['EarnGrowth'] = safe_extract_numeric(df_stats, 'earningsQuarterlyGrowth')
-
-            
-            # 2. Fetch History for Technicals (Trend, RSI, Volatility)
-            # Using yfinance for history as it handles multi-ticker adjusted close well
-            # Download last 6 months to safe bandwidth
-            hist_data = yf.download(chunk, period="6mo", interval="1d", group_by='ticker', progress=False, threads=False) # Disable threads for safety
-            
-            # Calculate Technicals per ticker
-            tech_data = {
-                'RSI': {},
-                'SMA20': {},
-                'SMA50': {},
-                'SMA200': {},
-                'HV_20': {}, # Historical Volatility
-                'Trend_50': {}, # Price vs SMA50
-                'Trend_200': {}, # Price vs SMA200
-                'EMA8': {}, 'EMA21': {}, 'EMA34': {}, 'EMA55': {}, 'EMA89': {},
-                'ADX': {}, 'StochK': {}
-            }
-            
             for ticker in chunk:
                 try:
-                    # Handle MultiIndex
                     if isinstance(hist_data.columns, pd.MultiIndex):
-                        if ticker in hist_data.columns.get_level_values(0):
-                             df_t = hist_data[ticker].copy()
-                        else:
+                        if ticker not in hist_data.columns.get_level_values(1):
                             continue
+                        df_t = hist_data.xs(ticker, axis=1, level=1).copy()
                     else:
-                        # Single ticker case (if chunk has only 1 item)
                         df_t = hist_data.copy()
                     
-                    if df_t.empty: continue
-                    
-                    # Cleanup
                     df_t = df_t.dropna(subset=['Close'])
-                    if len(df_t) < 50: continue
+                    if len(df_t) < 20:
+                        continue
                     
-                    close = df_t['Close']
-                    if isinstance(close, pd.DataFrame): close = close.iloc[:, 0] # Handle rare duplicate col case
+                    close = df_t['Close'].squeeze()
+                    high  = df_t['High'].squeeze()
+                    low   = df_t['Low'].squeeze()
+                    volume= df_t['Volume'].squeeze()
 
-                    # RSI
+                    # Volume
+                    vol_d[ticker] = volume.iloc[-1]
+                    # Change %
+                    if len(close) >= 2:
+                        change_d[ticker] = ((close.iloc[-1] - close.iloc[-2]) / close.iloc[-2]) * 100
+
+                    # RSI (14)
                     delta = close.diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rs = gain / loss
-                    rsi = 100 - (100 / (1 + rs))
-                    tech_data['RSI'][ticker] = rsi.iloc[-1]
-                    
+                    gain = delta.where(delta > 0, 0).rolling(14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+                    rsi_d[ticker] = (100 - 100 / (1 + gain / loss)).iloc[-1]
+
                     # SMAs
-                    tech_data['SMA20'][ticker] = close.rolling(window=20).mean().iloc[-1]
-                    tech_data['SMA50'][ticker] = close.rolling(window=50).mean().iloc[-1]
-                    tech_data['SMA200'][ticker] = close.rolling(window=200).mean().iloc[-1]
-                    
-                    # Historical Volatility (20D)
-                    log_ret = np.log(close / close.shift(1))
-                    hv = log_ret.rolling(window=20).std().iloc[-1] * np.sqrt(252) * 100
-                    tech_data['HV_20'][ticker] = hv
-                    
-                    curr_price = close.iloc[-1]
-                    tech_data['Trend_50'][ticker] = "Up" if curr_price > tech_data['SMA50'][ticker] else "Down"
-                    # Safe check for SMA200 existence
-                    sma200_val = tech_data['SMA200'].get(ticker)
-                    if sma200_val and not pd.isna(sma200_val):
-                         tech_data['Trend_200'][ticker] = "Up" if curr_price > sma200_val else "Down"
-                    else:
-                         tech_data['Trend_200'][ticker] = "Down"
-                    
-                    # --- New Tao Bull Technicals ---
-                    # EMAs: 8, 21, 34, 55, 89
-                    tech_data['EMA8'][ticker] = close.ewm(span=8, adjust=False).mean().iloc[-1]
-                    tech_data['EMA21'][ticker] = close.ewm(span=21, adjust=False).mean().iloc[-1]
-                    tech_data['EMA34'][ticker] = close.ewm(span=34, adjust=False).mean().iloc[-1]
-                    tech_data['EMA55'][ticker] = close.ewm(span=55, adjust=False).mean().iloc[-1]
-                    tech_data['EMA89'][ticker] = close.ewm(span=89, adjust=False).mean().iloc[-1]
+                    sma50_d[ticker]  = close.rolling(50).mean().iloc[-1]
+                    sma200_d[ticker] = close.rolling(200).mean().iloc[-1] if len(close) >= 200 else sma50_d[ticker]
+                    hv = np.log(close / close.shift(1)).rolling(20).std().iloc[-1] * np.sqrt(252) * 100
+                    hv_d[ticker] = hv
 
-                    # ADX (14)
-                    high = df_t['High']
-                    low = df_t['Low']
-                    
-                    plus_dm = high.diff()
-                    minus_dm = low.diff()
-                    plus_dm[plus_dm < 0] = 0
-                    minus_dm[minus_dm > 0] = 0
-                    
-                    tr1 = high - low
-                    tr2 = abs(high - close.shift(1))
-                    tr3 = abs(low - close.shift(1))
-                    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-                    atr_14 = tr.rolling(14).mean()
-                    
-                    plus_di = 100 * (plus_dm.ewm(alpha=1/14).mean() / atr_14)
-                    minus_di = 100 * (abs(minus_dm).ewm(alpha=1/14).mean() / atr_14)
-                    dx = (abs(plus_di - minus_di) / abs(plus_di + minus_di)) * 100
-                    tech_data['ADX'][ticker] = dx.rolling(14).mean().iloc[-1]
+                    # EMAs
+                    ema8_d[ticker]  = close.ewm(span=8,  adjust=False).mean().iloc[-1]
+                    ema21_d[ticker] = close.ewm(span=21, adjust=False).mean().iloc[-1]
+                    ema34_d[ticker] = close.ewm(span=34, adjust=False).mean().iloc[-1]
+                    ema55_d[ticker] = close.ewm(span=55, adjust=False).mean().iloc[-1]
+                    ema89_d[ticker] = close.ewm(span=89, adjust=False).mean().iloc[-1]
 
-                    # Stochastic %K (8, 3, 3)
-                    stoch_low = low.rolling(window=8).min()
-                    stoch_high = high.rolling(window=8).max()
-                    k_raw = 100 * ((close - stoch_low) / (stoch_high - stoch_low))
-                    # Smooth K by 3 (Slow Stoch K)
-                    tech_data['StochK'][ticker] = k_raw.rolling(window=3).mean().iloc[-1]
+                    # ADX
+                    pdm = high.diff().clip(lower=0)
+                    ndm = (-low.diff()).clip(lower=0)
+                    tr  = pd.concat([high - low, (high - close.shift()).abs(), (low - close.shift()).abs()], axis=1).max(axis=1)
+                    atr = tr.rolling(14).mean()
+                    pdi = 100 * pdm.ewm(alpha=1/14).mean() / atr
+                    ndi = 100 * ndm.ewm(alpha=1/14).mean() / atr
+                    dx  = (pdi - ndi).abs() / (pdi + ndi).abs() * 100
+                    adx_d[ticker] = dx.rolling(14).mean().iloc[-1]
+
+                    # Stoch %K
+                    k = 100 * (close - low.rolling(8).min()) / (high.rolling(8).max() - low.rolling(8).min())
+                    stochk_d[ticker] = k.rolling(3).mean().iloc[-1]
 
                 except Exception:
                     continue
-                    
-            # Merge Technicals into chunk_data
-            chunk_data['RSI'] = pd.Series(tech_data['RSI'])
-            chunk_data['SMA50'] = pd.Series(tech_data['SMA50'])
-            chunk_data['SMA200'] = pd.Series(tech_data['SMA200'])
 
-            chunk_data['HV_20'] = pd.Series(tech_data['HV_20'])
-            chunk_data['EMA8'] = pd.Series(tech_data['EMA8'])
-            chunk_data['EMA21'] = pd.Series(tech_data['EMA21'])
-            chunk_data['EMA34'] = pd.Series(tech_data['EMA34'])
-            chunk_data['EMA55'] = pd.Series(tech_data['EMA55'])
-            chunk_data['EMA89'] = pd.Series(tech_data['EMA89'])
-            chunk_data['ADX'] = pd.Series(tech_data['ADX'])
-            chunk_data['StochK'] = pd.Series(tech_data['StochK'])
+            chunk_data['Volume']  = pd.Series(vol_d)
+            chunk_data['Change%'] = pd.Series(change_d)
+            chunk_data['PreMkt%'] = 0.0  # Not available without live feed
+            chunk_data['RSI']     = pd.Series(rsi_d)
+            chunk_data['SMA50']   = pd.Series(sma50_d)
+            chunk_data['SMA200']  = pd.Series(sma200_d)
+            chunk_data['HV_20']   = pd.Series(hv_d)
+            chunk_data['EMA8']    = pd.Series(ema8_d)
+            chunk_data['EMA21']   = pd.Series(ema21_d)
+            chunk_data['EMA34']   = pd.Series(ema34_d)
+            chunk_data['EMA55']   = pd.Series(ema55_d)
+            chunk_data['EMA89']   = pd.Series(ema89_d)
+            chunk_data['ADX']     = pd.Series(adx_d)
+            chunk_data['StochK']  = pd.Series(stochk_d)
 
-            
             all_data.append(chunk_data)
-            
+
         except Exception as e:
             logger.info(f"Error processing chunk {current_chunk_idx}: {e}")
             continue
-            
+
     # Cleanup UI
     progress_bar.empty()
     status_text.empty()
