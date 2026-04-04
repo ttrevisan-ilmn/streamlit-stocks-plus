@@ -37,25 +37,40 @@ def render_screener():
             if not results.empty:
                 st.success(f"Found {len(results)} candidates for {strategy}.")
                 
-                # Interactive Table
+                # Clean up raw data before display
+                display_cols = ['Price', 'MarketCap', 'Beta', 'PE', 'RSI', 'HV_20',
+                                'Change%', 'ADX', 'StochK', 'ROE', 'OpMargin',
+                                'RevGrowth', 'EarnGrowth', 'EQGrowth', 'AnalystRec',
+                                'DivYield', 'SMA50', 'Float', 'Volume']
+                # Only show columns that actually exist in results
+                show_cols = [c for c in display_cols if c in results.columns]
+                display_df = results[show_cols].copy()
+                
+                fmt = {
+                    'Price':      '${:.2f}',
+                    'MarketCap':  '${:,.0f}',
+                    'Beta':       '{:.2f}',
+                    'PE':         '{:.1f}',
+                    'RSI':        '{:.1f}',
+                    'SMA50':      '${:.2f}',
+                    'HV_20':      '{:.1f}%',
+                    'Float':      '{:,.0f}',
+                    'Volume':     '{:,.0f}',
+                    'Change%':    '{:+.2f}%',
+                    'ADX':        '{:.1f}',
+                    'StochK':     '{:.1f}',
+                    'ROE':        '{:.1%}',
+                    'OpMargin':   '{:.1%}',
+                    'RevGrowth':  '{:+.1%}',
+                    'EarnGrowth': '{:+.1%}',
+                    'EQGrowth':   '{:+.1%}',
+                    'AnalystRec': '{:.1f}',
+                    'DivYield':   '{:.2%}',
+                }
+                active_fmt = {k: v for k, v in fmt.items() if k in display_df.columns}
+                
                 st.dataframe(
-                    results.style.format({
-                        'Price': '${:.2f}',
-                        'MarketCap': '${:,.0f}',
-                        'PE': '{:.1f}',
-                        'DivYield': '{:.2%}',
-                        'RSI': '{:.1f}',
-                        'SMA50': '${:.2f}',
-                        'HV_20': '{:.1f}%',
-                        'Float': '{:,.0f}',
-                        'Change%': '{:.2f}%',
-                        'PreMkt%': '{:.2f}%',
-                        'ADX': '{:.1f}',
-                        'StochK': '{:.1f}',
-                        'ROE': '{:.1%}',
-                        'OpMargin': '{:.1%}',
-                        'RevGrowth': '{:.1%}'
-                    }), 
+                    display_df.style.format(active_fmt, na_rep="—"),
                     use_container_width=True,
                     height=500
                 )
