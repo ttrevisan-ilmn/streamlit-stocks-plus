@@ -343,11 +343,10 @@ def apply_strategy(df, strategy):
             filtered['RVOL'] = filtered['Volume'] / filtered['AvgVol']
             
         mask = (
-            (filtered['ROE'] > 0.10) &              # Return on equity > 10%
-            (filtered['OpMargin'] > 0.10) &         # Operating Margins > 10%
-            (filtered['RevGrowth'] > 0.05) &        # Sales growth > 5%
-            (filtered['Price'] > filtered['SMA50']) & # Positive Trend
-            (filtered['RVOL'] > 1.0)                # Money flowing in (Buying pressure)
+            (filtered['ROE'].fillna(0) > 0.05) &              # Return on equity > 5%
+            (filtered['OpMargin'].fillna(0) > 0.05) &         # Operating Margins > 5%
+            (filtered['RevGrowth'].fillna(0) > 0.0) &         # Positive Sales growth
+            (filtered['Price'] > filtered['SMA50'])           # Positive Trend
         )
         filtered = filtered[mask].sort_values('RevGrowth', ascending=False)
 
