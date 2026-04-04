@@ -96,6 +96,12 @@ def fetch_screener_data(tickers, limit=None):
             chunk_data['Float'] = safe_extract_numeric(df_stats, 'floatShares')
             chunk_data['Change%'] = safe_extract_numeric(df_price, 'regularMarketChangePercent') * 100 # Convert to %
             chunk_data['PreMkt%'] = safe_extract_numeric(df_price, 'preMarketChangePercent') * 100
+            
+            # Navellier Metrics
+            chunk_data['ROE'] = safe_extract_numeric(df_stats, 'returnOnEquity')
+            chunk_data['OpMargin'] = safe_extract_numeric(df_stats, 'operatingMargins')
+            chunk_data['RevGrowth'] = safe_extract_numeric(df_stats, 'revenueGrowth')
+            chunk_data['EarnGrowth'] = safe_extract_numeric(df_stats, 'earningsQuarterlyGrowth')
 
             
             # 2. Fetch History for Technicals (Trend, RSI, Volatility)
@@ -327,5 +333,22 @@ def apply_strategy(df, strategy):
             ((filtered['Change%'] > 20.0) | (filtered['PreMkt%'] > 20.0))
         )
         filtered = filtered[mask].sort_values('Change%', ascending=False)
+        
+    elif strategy == "Navellier A-Rated Growth":
+        # Screen for stocks exhibiting strong fundamentals and momentum
+        # Criteria match the Navellier 'A' methodology
+        # Technical confirmation: Price > SMA50 (Uptrend) and RSI > 50 (Momentum)
+        
+        if 'RVOL' not in filtered:
+            filtered['RVOL'] = filtered['Volume'] / filtered['AvgVol']
+            
+        mask = (
+            (filtered['ROE'] > 0.10) &              # Return on equity > 10%
+            (filtered['OpMargin'] > 0.10) &         # Operating Margins > 10%
+            (filtered['RevGrowth'] > 0.05) &        # Sales growth > 5%
+            (filtered['Price'] > filtered['SMA50']) & # Positive Trend
+            (filtered['RVOL'] > 1.0)                # Money flowing in (Buying pressure)
+        )
+        filtered = filtered[mask].sort_values('RevGrowth', ascending=False)
 
     return filtered.head(40) # Return top 40 results

@@ -15,7 +15,8 @@ def render_screener():
             "Mid Momentum",
             "Safe Long",
             "Ultimate Stacked Bulls",
-            "Day Trade Runners"
+            "Day Trade Runners",
+            "Navellier A-Rated Growth"
         ])
         
         # Add Quick Scan Option
@@ -50,7 +51,10 @@ def render_screener():
                         'Change%': '{:.2f}%',
                         'PreMkt%': '{:.2f}%',
                         'ADX': '{:.1f}',
-                        'StochK': '{:.1f}'
+                        'StochK': '{:.1f}',
+                        'ROE': '{:.1%}',
+                        'OpMargin': '{:.1%}',
+                        'RevGrowth': '{:.1%}'
                     }), 
                     use_container_width=True,
                     height=500
