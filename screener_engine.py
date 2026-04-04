@@ -99,9 +99,9 @@ def fetch_screener_data(tickers, limit=None):
             for ticker in chunk:
                 try:
                     if isinstance(hist_data.columns, pd.MultiIndex):
-                        if ticker not in hist_data.columns.get_level_values(1):
+                        if ticker not in hist_data.columns.get_level_values(0):
                             continue
-                        df_t = hist_data.xs(ticker, axis=1, level=1).copy()
+                        df_t = hist_data.xs(ticker, axis=1, level=0).copy()
                     else:
                         df_t = hist_data.copy()
                     

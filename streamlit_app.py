@@ -321,107 +321,119 @@ try:
 except Exception as e:
     st.warning("⚠️ Top signals temporarily unavailable.")
 
+# --- SIDEBAR NAVIGATION (Persists across reruns unlike st.tabs) ---
+st.sidebar.divider()
+TAB_LABELS = [
+    "📊 Market Health",
+    "📈 Sector Rotation",
+    "🌐 Intermarket",
+    "📉 Stock Analysis",
+    "🏛️ Congress Trades",
+    "🌪️ Options Flow",
+    "🔍 Stock Screener",
+    "⚡ Power Gauge",
+    "📉 Stage Analysis",
+    "🚀 CANSLIM",
+    "💼 Navellier Grade",
+]
+
+if 'active_view' not in st.session_state:
+    st.session_state.active_view = TAB_LABELS[0]
+
+active_view = st.sidebar.radio(
+    "Navigate",
+    TAB_LABELS,
+    key='active_view',
+)
+
 st.divider()
 
-# --- MAIN TABS ---
-TAB_LABELS = ["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades", "🌪️ Options Flow", "🔍 Stock Screener", "⚡ Power Gauge", "📉 Stage Analysis", "🚀 CANSLIM", "💼 Navellier Grade"]
-tab1, tab2, tab5, tab3, tab4, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs(TAB_LABELS)
-
-# --- TAB 1: MARKET HEALTH DASHBOARD ---
-with tab1:
+# --- RENDER ACTIVE VIEW ---
+if active_view == "📊 Market Health":
     try:
         from views.market_health import render_market_health
         render_market_health(render_mini_chart_html, track_api_call)
     except Exception as e:
-        logger.error(f"Error rendering Market Health tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering Market Health: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
 
-# --- TAB 2: SEAF MODEL (SECTOR ETF ASSET FLOWS) ---
-with tab2:
+elif active_view == "📈 Sector Rotation":
     try:
         from views.sector_rotation import render_sector_rotation
         render_sector_rotation(track_api_call)
     except Exception as e:
-        logger.error(f"Error rendering Sector Rotation tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering Sector Rotation: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
 
-# --- TAB 5: INTERMARKET ANALYSIS ---
-with tab5:
+elif active_view == "🌐 Intermarket":
     try:
         from views.intermarket import render_intermarket
         render_intermarket(track_api_call)
     except Exception as e:
-        logger.error(f"Error rendering Intermarket tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering Intermarket: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
 
-# --- TAB 3: STOCK TICKER ANALYSIS ---
-with tab3:
+elif active_view == "📉 Stock Analysis":
     try:
         from views.stock_analysis import render_stock_analysis
         render_stock_analysis(ticker, track_api_call, run_analysis_pipeline, calculate_mphinancial_mechanics, get_tv_symbol)
     except Exception as e:
-        logger.error(f"Error rendering Stock Analysis tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering Stock Analysis: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
 
-# --- TAB 6: OPTIONS INTELLIGENCE ---
-with tab6:
-    try:
-        from views.options_intelligence import render_options_intelligence
-        render_options_intelligence(ticker, track_api_call)
-    except Exception as e:
-        logger.error(f"Error rendering Options Intelligence tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
-
-# --- TAB 4: CONGRESS TRADES ---
-with tab4:
+elif active_view == "🏛️ Congress Trades":
     try:
         from views.congress_trades import render_congress_trades
         render_congress_trades(track_api_call)
     except Exception as e:
-        logger.error(f"Error rendering Congress Trades tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering Congress Trades: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
 
-# --- TAB 7: STOCK SCREENER ---
-with tab7:
+elif active_view == "🌪️ Options Flow":
+    try:
+        from views.options_intelligence import render_options_intelligence
+        render_options_intelligence(ticker, track_api_call)
+    except Exception as e:
+        logger.error(f"Error rendering Options Flow: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
+
+elif active_view == "🔍 Stock Screener":
     try:
         from views.screener_tab import render_screener
         render_screener()
     except Exception as e:
-        logger.error(f"Error rendering Screener tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering Screener: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
 
-# --- TAB 8: POWER GAUGE ---
-with tab8:
+elif active_view == "⚡ Power Gauge":
     try:
         from views.power_gauge_tab import render_power_gauge
         render_power_gauge(ticker)
     except Exception as e:
-        logger.error(f"Error rendering Power Gauge tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering Power Gauge: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
 
-# --- TAB 9: WEINSTEIN STAGE ANALYSIS ---
-with tab9:
+elif active_view == "📉 Stage Analysis":
     try:
         from views.weinstein_tab import render_weinstein
         render_weinstein(ticker)
     except Exception as e:
-        logger.error(f"Error rendering Weinstein Stage Analysis tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering Stage Analysis: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
 
-# --- TAB 10: CANSLIM STRATEGY ---
-with tab10:
+elif active_view == "🚀 CANSLIM":
     try:
         from views.canslim_tab import render_canslim
         render_canslim(ticker)
     except Exception as e:
-        logger.error(f"Error rendering CANSLIM Strategy tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering CANSLIM: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
 
-# --- TAB 11: NAVELLIER GRADER ---
-with tab11:
+elif active_view == "💼 Navellier Grade":
     try:
         from views.navellier_tab import render_navellier
         render_navellier(ticker)
     except Exception as e:
-        logger.error(f"Error rendering Navellier Grader tab: {e}")
-        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+        logger.error(f"Error rendering Navellier Grade: {e}")
+        st.error("⚠️ An error occurred. Please try again later.")
+
