@@ -106,7 +106,17 @@ def render_power_gauge(ticker):
         </style>
         """, unsafe_allow_html=True)
         
-        def render_category(col, title, data, highlight=False):
+        def format_currency(val):
+            if val is None or pd.isna(val): return "N/A"
+            if val >= 1e9: return f"${val/1e9:.2f}b"
+            if val >= 1e6: return f"${val/1e6:.2f}m"
+            return f"${val:,.2f}"
+
+        def format_num(val, decimals=2):
+            if val is None or pd.isna(val): return "N/A"
+            return f"{val:.{decimals}f}"
+
+        def render_category(col, title, data, cat_name, md=None, highlight=False):
             highlight_class = "expert-highlight" if highlight else ""
             
             html = f"""
@@ -115,12 +125,10 @@ def render_power_gauge(ticker):
             """
             
             for factor, score in data.items():
-                # Determine color class
                 if score >= 65: color_class = "color-green"
                 elif score >= 35: color_class = "color-yellow"
                 else: color_class = "color-red"
                 
-                # Special highlight for CMF
                 label_display = factor
                 if factor == "Chaikin Money Flow":
                     label_display = f'<span style="color: #22c55e; font-weight: bold;">{factor} (CMF)</span>'
@@ -133,14 +141,67 @@ def render_power_gauge(ticker):
                     </div>
                 </div>
                 """
+            
+            # Additional tables for specific categories matching Chaikin style
+            if cat_name == "Financials" and md:
+                html += f"""
+                <div style="margin-top:20px; font-size:0.85rem; color:#94a3b8; display:flex; justify-content:space-between; text-align:left;">
+                    <div>
+                        <div style="color:#60a5fa; margin-bottom:5px;">Assets & Liab</div>
+                        <div>Curr Ratio: <span style="color:#fff">{format_num(md.get('currentRatio'))}</span></div>
+                        <div>LT Debt/Eq: <span style="color:#fff">{format_num(md.get('debtToEquity'))}</span></div>
+                        <div>Mkt Cap: <span style="color:#fff">{format_currency(md.get('marketCap'))}</span></div>
+                        <div>Revenue: <span style="color:#fff">{format_currency(md.get('totalRevenue'))}</span></div>
+                    </div>
+                    <div>
+                        <div style="color:#60a5fa; margin-bottom:5px;">Valuation</div>
+                        <div>P/E: <span style="color:#fff">{format_num(md.get('trailingPE'))}</span></div>
+                        <div>PEG: <span style="color:#fff">{format_num(md.get('pegRatio'))}</span></div>
+                        <div>P/B: <span style="color:#fff">{format_num(md.get('priceToBook'))}</span></div>
+                        <div>P/S: <span style="color:#fff">{format_num(md.get('priceToSales'))}</span></div>
+                    </div>
+                    <div>
+                        <div style="color:#60a5fa; margin-bottom:5px;">Dividends</div>
+                        <div>Yield: <span style="color:#fff">{format_num(md.get('dividendYield'))}%</span></div>
+                    </div>
+                </div>
+                """
+            elif cat_name == "Technicals" and md:
+                vol_str = "More Volatile" if (md.get('beta') or 1) > 1 else "Less Volatile"
+                html += f"""
+                <div style="margin-top:20px; font-size:0.85rem; color:#94a3b8; display:flex; justify-content:space-between; text-align:left;">
+                    <div>
+                        <div style="color:#60a5fa; margin-bottom:5px;">Price Activity</div>
+                        <div>52w High: <span style="color:#fff">{format_num(md.get('fiftyTwoWeekHigh'))}</span></div>
+                        <div>52w Low: <span style="color:#fff">{format_num(md.get('fiftyTwoWeekLow'))}</span></div>
+                    </div>
+                    <div>
+                        <div style="color:#60a5fa; margin-bottom:5px;">Price % Chg</div>
+                        <div>4wk chg: <span style="color:#fff">{format_num(md.get('chg4wk'))}%</span></div>
+                        <div>24wk chg: <span style="color:#fff">{format_num(md.get('chg24wk'))}%</span></div>
+                    </div>
+                    <div>
+                        <div style="color:#60a5fa; margin-bottom:5px;">Volume</div>
+                        <div>20d Avg: <span style="color:#fff">{format_num(md.get('avgVol20Day'), 0)}</span></div>
+                        <div>90d Avg: <span style="color:#fff">{format_num(md.get('avgVol90Day'), 0)}</span></div>
+                    </div>
+                    <div>
+                        <div style="color:#60a5fa; margin-bottom:5px;">Volatility</div>
+                        <div>Beta: <span style="color:#fff">{format_num(md.get('beta'))}</span></div>
+                        <div><span style="color:#fff">{vol_str}</span></div>
+                    </div>
+                </div>
+                """
+
             html += "</div>"
             with col:
                 st.markdown(html, unsafe_allow_html=True)
         
-        render_category(c1, "💰 Financials", gauge['details']['Financials'])
-        render_category(c2, "📈 Earnings", gauge['details']['Earnings'])
-        render_category(c3, "🛠️ Technicals", gauge['details']['Technicals'])
-        render_category(c4, "🧠 Experts (The Secret Sauce)", gauge['details']['Experts'], highlight=True)
+        md = gauge.get('metadata', {})
+        render_category(c1, "💰 Financials", gauge['details']['Financials'], "Financials", md)
+        render_category(c2, "📈 Earnings", gauge['details']['Earnings'], "Earnings", md)
+        render_category(c3, "🛠️ Technicals", gauge['details']['Technicals'], "Technicals", md)
+        render_category(c4, "🧠 Experts (The Secret Sauce)", gauge['details']['Experts'], "Experts", md, highlight=True)
     elif not gauge and ticker:
         st.warning(f"⚠️ Power Gauge data unavailable for {ticker}. Check connection or API limits.")
         if st.button("Retry Power Gauge", key="retry_power_gauge"):

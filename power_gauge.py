@@ -231,11 +231,33 @@ def calculate_power_gauge(ticker):
         elif final_score <= 35: rating = "BEARISH"
         else: rating = "NEUTRAL"
         
+        # Extract metadata for the detailed UI panels
+        metadata = {
+            "currentRatio": info.get("currentRatio"),
+            "debtToEquity": info.get("debtToEquity", 0) / 100 if info.get("debtToEquity") else None, # Assuming it's given as 29 for 0.29
+            "marketCap": info.get("marketCap"),
+            "totalRevenue": info.get("totalRevenue"),
+            "trailingPE": info.get("trailingPE"),
+            "pegRatio": info.get("pegRatio"),
+            "priceToBook": info.get("priceToBook"),
+            "priceToSales": info.get("priceToSalesTrailing12Months"),
+            "dividendYield": info.get("dividendYield", 0) * 100 if info.get("dividendYield") else 0,
+            "annualEps": info.get("trailingEps"),
+            "beta": info.get("beta"),
+            "fiftyTwoWeekHigh": info.get("fiftyTwoWeekHigh"),
+            "fiftyTwoWeekLow": info.get("fiftyTwoWeekLow"),
+            "avgVol20Day": history['Volume'].rolling(20).mean().iloc[-1] if not history.empty and len(history)>=20 else None,
+            "avgVol90Day": history['Volume'].rolling(90).mean().iloc[-1] if not history.empty and len(history)>=90 else None,
+            "chg4wk": ((history['Close'].iloc[-1] / history['Close'].iloc[-20]) - 1) * 100 if not history.empty and len(history)>=20 else None,
+            "chg24wk": ((history['Close'].iloc[-1] / history['Close'].iloc[-120]) - 1) * 100 if not history.empty and len(history)>=120 else None
+        }
+        
         return {
             "rating": rating,
             "score": final_score,
             "categories": cat_scores,
-            "details": categories
+            "details": categories,
+            "metadata": metadata
         }
         
     except Exception as e:
