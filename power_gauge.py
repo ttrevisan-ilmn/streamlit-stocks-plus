@@ -199,7 +199,16 @@ def calculate_power_gauge(ticker):
     """
     try:
         t = yf.Ticker(ticker)
-        info = t.info
+        
+        # Safely fetch info, as this is known to fail on Streamlit Cloud due to Yahoo API crumb issues
+        try:
+            info = t.info
+            if info is None:
+                info = {}
+        except Exception as info_err:
+            logger.warning(f"Failed to fetch yfinance info for {ticker}: {info_err}")
+            info = {}
+            
         history = t.history(period="1y")
         
         financials = get_financial_score(info)
